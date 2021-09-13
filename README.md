@@ -17,5 +17,5 @@ include_directories(${EIGEN3_INCLUDE_DIRS})
 ```
 
 ## Reference
-[Problem set](https://github.com/adlarkin/Probabilistic_robotics/tree/master/EKF)
-[Code modified form](https://github.com/nghiaho12/EKF_localization_known_correspondences)
+[Problem spec](https://github.com/adlarkin/Probabilistic_robotics/tree/master/EKF)  
+[Code modified from](https://github.com/nghiaho12/EKF_localization_known_correspondences)
