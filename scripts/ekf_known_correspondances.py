@@ -138,7 +138,6 @@ if __name__ == "__main__":
     '''run EKF'''
     mu = np.array([[mu_x[0,0]],[mu_y[0,0]],[mu_theta[0,0]]])
     for i in range(1, t.size):
-        print("new time")
         curr_v = v_c[0,i]
         curr_w = omg_c[0,i]
         prev_theta = mu_theta[0,i-1]
@@ -155,58 +154,33 @@ if __name__ == "__main__":
         bel_x = mu_bar[0,0]
         bel_y = mu_bar[1,0]
         bel_theta = mu_bar[2,0]
-        for k in range(len(lm_y)):
-            npLikelihood = np.array([])
-            list_z_hat = []
-            list_S_t = []
-            list_H_t = []
-            # assume 
-            obs_k_x = lm_x[k]
-            obs_k_y = lm_y[k]
+        
+        for j in range(len(lm_y)):
+            m_j_x = lm_x[j]
+            m_j_y = lm_y[j]
+
             '''get the sensor measurement'''
             real_x = x_pos_true[0,i]
             real_y = y_pos_true[0,i]
             real_tehta = theta_pos_true[0,i]
-            diff_x = obs_k_x - real_x
-            diff_y = obs_k_y - real_y
+            diff_x = m_j_x - real_x
+            diff_y = m_j_y - real_y
             q = (diff_x ** 2) + (diff_y ** 2)
             z_true = np.array([ [np.sqrt(q)],
                                 [arctan2(diff_y, diff_x) - real_tehta] ])
-            z_true += make_noise(Q_t)
-            for j in range(len(lm_y)):
-                m_j_x = lm_x[j]
-                m_j_y = lm_y[j]
-                                              
-                '''likelihood'''
-                diff_x = m_j_x - bel_x
-                diff_y = m_j_y - bel_y
-                q = (diff_x ** 2) + (diff_y ** 2)
-                z_hat = np.array([ [np.sqrt(q)],
-                                    [arctan2(diff_y, diff_x) - bel_theta] ])
-                H_t = np.array([ [-diff_x / np.sqrt(q), -diff_y / np.sqrt(q), 0],
-                                 [diff_y / q, -diff_x / q, -1] ])
-                S_t = (H_t @ sigma_bar @ (H_t.T)) + Q_t
-                likelihood = np.sqrt(np.linalg.det(2*np.pi*S_t)) * math.exp(-0.5*((z_true-z_hat).T)@(np.linalg.inv(S_t))@(z_true-z_hat))
-                npLikelihood = np.append(npLikelihood,likelihood)
-                # if np_z_hat.size == 0:
-                #     np_z_hat = z_hat
-                #     np_H_t = H_t
-                #     np_S_t = S_t
-                # else:
-                #     np_z_hat = np.hstack((np_z_hat,z_hat))
-                #     np_H_t = np.hstack((np_H_t,H_t))
-                #     np_S_t = np.hstack((np_S_t,S_t))
-                list_z_hat.append(z_hat)
-                list_S_t.append(S_t)
-                list_H_t.append(H_t)
-            '''maximum likelihood'''
-            maxLikelihood = npLikelihood.argmax()
-            # np_z_hat = np.asarray(list_z_hat[maxLikelihood])
-            # np_S_t = np.asarray(list_S_t)
-            # np_H_t = np.asarray(list_H_t)
-            H_t = list_H_t.pop(maxLikelihood)
-            S_t = list_S_t.pop(maxLikelihood)
-            z_hat = list_z_hat.pop(maxLikelihood)
+            z_true += make_noise(Q_t)      
+
+            '''likelihood'''
+            diff_x = m_j_x - bel_x
+            diff_y = m_j_y - bel_y
+            q = (diff_x ** 2) + (diff_y ** 2)
+            z_hat = np.array([ [np.sqrt(q)],
+                                [arctan2(diff_y, diff_x) - bel_theta] ])
+            H_t = np.array([ [-diff_x / np.sqrt(q), -diff_y / np.sqrt(q), 0],
+                            [diff_y / q, -diff_x / q, -1] ])
+            S_t = (H_t @ sigma_bar @ (H_t.T)) + Q_t
+            likelihood = np.sqrt(np.linalg.det(2*np.pi*S_t)) * math.exp(-0.5*((z_true-z_hat).T)@(np.linalg.inv(S_t))@(z_true-z_hat))
+            
             '''kalman gain and update belief'''
             K_t = sigma_bar @ (H_t.T) @ np.linalg.inv(S_t)
             mu_bar = mu_bar+K_t@(z_true-z_hat)
