@@ -29,14 +29,15 @@ def plot_traj(true_states, belief_states, markers):
     ax = plt.axes(xlim=world_bounds, ylim=world_bounds)
     ax.set_aspect('equal')
     plt.scatter(markers[0], markers[1], marker='X',s=100, color='g', label='ref landmarks')
-    plt.scatter(x_tr[0][x_tr.shape[1]-1],y_tr[0][y_tr.shape[1]-1], s=500, color='y', ec='k')
-    plt.plot( [x_tr[0][x_tr.shape[1]-1], x_tr[0][x_tr.shape[1]-1] + radius*cos(th_tr[0][x_tr.shape[1]-1])], 
-               [y_tr[0][x_tr.shape[1]-1], y_tr[0][x_tr.shape[1]-1] + radius*sin(th_tr[0][x_tr.shape[1]-1])], color='k' )
     plt.scatter(x_tr[0], y_tr[0], color='b', label="Actual", s=10)
     plt.scatter(x_guess[0], y_guess[0], color='r', label="Predicted", s=10)
 
-    plt.legend()
+    '''plot final state'''
+    plt.scatter(x_tr[0][x_tr.shape[1]-1],y_tr[0][y_tr.shape[1]-1], s=500, color='y', ec='k')
+    plt.plot( [x_tr[0][x_tr.shape[1]-1], x_tr[0][x_tr.shape[1]-1] + radius*cos(th_tr[0][x_tr.shape[1]-1])], 
+               [y_tr[0][x_tr.shape[1]-1], y_tr[0][x_tr.shape[1]-1] + radius*sin(th_tr[0][x_tr.shape[1]-1])], color='k' )
 
+    plt.legend()
     plt.show()
 
 def get_mu_bar(prev_mu, velocity, omega, angle, dt):
@@ -108,8 +109,7 @@ if __name__ == "__main__":
     '''std deviation of range and bearing sensor noise for each landmark'''
     std_dev_range = .1
     std_dev_bearing = .05
-
-    # uncertainty due to measurement noise
+    '''uncertainty due to measurement noise'''
     Q_t = np.array( [[std_dev_range, 0],
                      [0, std_dev_bearing]] )
 
@@ -134,7 +134,8 @@ if __name__ == "__main__":
         x_pos_true[0, timestep] = next_state[0]
         y_pos_true[0, timestep] = next_state[1]
         theta_pos_true[0, timestep] = next_state[2]
-    plot_traj((x_pos_true, y_pos_true, theta_pos_true), (x_pos_true, y_pos_true), (lm_x, lm_y))
+    # plot_traj((x_pos_true, y_pos_true, theta_pos_true), (x_pos_true, y_pos_true), (lm_x, lm_y))
+    
     '''run EKF'''
     mu = np.array([[mu_x[0,0]],[mu_y[0,0]],[mu_theta[0,0]]])
     for i in range(1, t.size):
