@@ -19,7 +19,7 @@ from scipy.io import loadmat
 
 import sys
 
-def plot_traj(true_states, belief_states, markers):
+def plot_traj(true_states, belief_states, markers, markers_map, index):
     x_tr, y_tr, th_tr = true_states
     x_guess, y_guess = belief_states
 
@@ -31,14 +31,14 @@ def plot_traj(true_states, belief_states, markers):
     ax.set_aspect('equal')
 
     '''plot landmarkers'''
-    plt.scatter(markers[0], markers[1], marker='X',s=100, color='g', label='ref landmarks')
+    plt.scatter(markers_map[0], markers_map[1], marker='X',s=100, color='g', label='ref landmarks')
     number_of_point=12
     piece_rad = np.pi/(number_of_point/2)
     
     for j in range( len(markers[0]) ):
         neg_bd = []
         for i in range(number_of_point):
-            neg_bd.append((markers[0][j]+markers[2][j]*np.cos(piece_rad*i), markers[1][j]+markers[2][j]*np.sin(piece_rad*i)))
+            neg_bd.append((markers_map[0][j]+markers_map[2][j]*np.cos(piece_rad*i), markers_map[1][j]+markers_map[2][j]*np.sin(piece_rad*i)))
         neg_bd=np.asarray(neg_bd)
         plt.scatter(neg_bd[:,0], neg_bd[:,1], c='k', s=10)
 
@@ -47,9 +47,17 @@ def plot_traj(true_states, belief_states, markers):
     plt.scatter(x_guess[0], y_guess[0], color='r', label="Predicted", s=10)
 
     '''plot final state'''
-    plt.scatter(x_tr[0][x_tr.shape[1]-1],y_tr[0][y_tr.shape[1]-1], s=500, color='y', ec='k')
-    plt.plot( [x_tr[0][x_tr.shape[1]-1], x_tr[0][x_tr.shape[1]-1] + radius*cos(th_tr[0][x_tr.shape[1]-1])], 
-               [y_tr[0][x_tr.shape[1]-1], y_tr[0][x_tr.shape[1]-1] + radius*sin(th_tr[0][x_tr.shape[1]-1])], color='k' )
+    plt.scatter(x_tr[0][index],y_tr[0][index], s=500, color='y', ec='k')
+    plt.plot( [x_tr[0][index], x_tr[0][index] + radius*cos(th_tr[0][index]) ], 
+               [y_tr[0][index], y_tr[0][index] + radius*sin(th_tr[0][index]) ], color='k' )
+
+    '''plot obs lm'''
+    plt.plot([ markers[0][0],x_guess[0][index] ],
+             [ markers[1][0],y_guess[0][index] ], color='k')
+    plt.plot([ markers[0][1],x_guess[0][index] ],
+             [ markers[1][1],y_guess[0][index] ], color='k')
+    # plt.plot([ markers[0][2],x_guess[0][index] ],
+    #          [ markers[1][2],y_guess[0][index] ], color='k')
 
     plt.legend()
     plt.show()
@@ -63,7 +71,7 @@ def get_mu_bar(prev_mu, velocity, omega, angle, dt):
 
 def get_observed_lm(mu_bar, global_lm):
     
-    return global_lm[0]-mu_bar[0,0],global_lm[1]-mu_bar[1,0]
+    return global_lm[0][:2],global_lm[1][:2],global_lm[1][:2]
 
 def get_G_t(v, w, angle, dt):
     return np.array([
@@ -174,7 +182,7 @@ if __name__ == "__main__":
         '''prediction step'''
         # mu_bar = get_mu_bar(mu, curr_v, curr_w, prev_theta, dt)
         mu = np.array([ [x_pos_true[0,i]],[y_pos_true[0,i]],[theta_pos_true[0,i]] ])
-        mu_bar = mu+make_noise(Q_t)
+        mu_bar = mu+make_noise(sigma)
         sigma_bar = (G_t @ sigma @ (G_t.T)) + (V_t @ M_t @ (V_t.T))
 
         '''correction (updating belief based on landmark readings)'''
@@ -182,7 +190,8 @@ if __name__ == "__main__":
         bel_y = mu_bar[1,0]
         bel_theta = mu_bar[2,0]
         # cannot observe all lm !
-        obs_lm_x, obs_lm_y = get_observed_lm(mu, (lm_x, lm_y))
+        obs_lm_x, obs_lm_y, obs_lm_radi= get_observed_lm(mu, (lm_x, lm_y, lm_radi))
+        
         for k in range(len(obs_lm_y)):
             npLikelihood = np.array([])
             list_z_hat = []
@@ -191,16 +200,17 @@ if __name__ == "__main__":
             
             obs_k_x = obs_lm_x[k]
             obs_k_y = obs_lm_y[k]
-            obs_k_radi = lm_radi[k]
+            obs_k_radi = obs_lm_radi[k]
+            
             '''get the sensor measurement'''
-            # real_x = x_pos_true[0,i]
-            # real_y = y_pos_true[0,i]
-            # real_tehta = theta_pos_true[0,i]
-            # diff_x = obs_k_x - real_x
-            # diff_y = obs_k_y - real_y
-            # q = (diff_x ** 2) + (diff_y ** 2)
-            z_true = np.array([ [obs_k_x],
-                                [obs_k_y],
+            real_x = x_pos_true[0,i]
+            real_y = y_pos_true[0,i]
+            real_tehta = theta_pos_true[0,i]
+            diff_x = obs_k_x - real_x
+            diff_y = obs_k_y - real_y
+            q = (diff_x ** 2) + (diff_y ** 2)
+            z_true = np.array([ [np.sqrt(q)],
+                                [arctan2(diff_y, diff_x) - real_tehta],
                                 [obs_k_radi] ])
             z_true += make_noise(Q_t)
             for j in range(len(lm_y)):
@@ -211,14 +221,13 @@ if __name__ == "__main__":
                 '''likelihood'''
                 diff_x = m_j_x - bel_x
                 diff_y = m_j_y - bel_y
-                # q = (diff_x ** 2) + (diff_y ** 2)
-                z_hat = np.array([ [diff_x],
-                                   [diff_y],
-                                   [m_j_radi] ])
-
-                H_t = np.array([ [-1, 0, 0],
-                                 [0, -1, 0],
-                                 [0, 0, 0] ])
+                q = (diff_x ** 2) + (diff_y ** 2)
+                z_hat = np.array([ [np.sqrt(q)],
+                                    [arctan2(diff_y, diff_x) - bel_theta],
+                                    [m_j_radi] ])
+                H_t = np.array([ [-diff_x / np.sqrt(q), -diff_y / np.sqrt(q), 0],
+                                 [diff_y / q, -diff_x / q, -1],
+                                 [0,0,0] ])
                 S_t = (H_t @ sigma_bar @ (H_t.T)) + Q_t
                 likelihood = np.sqrt(np.linalg.det(2*np.pi*S_t)) * math.exp(-0.5*((z_true-z_hat).T)@(np.linalg.inv(S_t))@(z_true-z_hat))
                 npLikelihood = np.append(npLikelihood,likelihood)
@@ -241,4 +250,6 @@ if __name__ == "__main__":
         mu_x[0 , i] = mu[0 , 0]
         mu_y[0 , i] = mu[1 , 0]
         mu_theta[0 , i] = mu[2 , 0]
-    plot_traj((x_pos_true, y_pos_true, theta_pos_true), (mu_x, mu_y), (lm_x, lm_y, lm_radi)) 
+        
+        if i%50 == 0:
+            plot_traj((x_pos_true, y_pos_true, theta_pos_true), (mu_x, mu_y), (obs_lm_x, obs_lm_y, lm_radi),(lm_x,lm_y,lm_radi),i) 
