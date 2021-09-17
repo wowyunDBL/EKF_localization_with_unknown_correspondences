@@ -4,7 +4,7 @@ import math
 import numpy as np
 from numpy import cos, sin, arctan2
 from scipy.spatial import distance as dist
-from shapely import geometry
+#from shapely import geometry
 
 '''plot tool'''
 import matplotlib.pyplot as plt
@@ -34,10 +34,13 @@ def plot_traj(true_states, belief_states, markers):
     plt.scatter(markers[0], markers[1], marker='X',s=100, color='g', label='ref landmarks')
     number_of_point=12
     piece_rad = np.pi/(number_of_point/2)
-    neg_bd = []
-    for i in range(number_of_point):
-        neg_bd.append((markers[0]+markers[2]*np.cos(piece_rad*i), markers[1]+markers[2]*np.sin(piece_rad*i)))
-    plt.scatter(neg_bd[:,0], neg_bd[:,1], c='k', s=10)
+    
+    for j in range( len(markers[0]) ):
+        neg_bd = []
+        for i in range(number_of_point):
+            neg_bd.append((markers[0][j]+markers[2][j]*np.cos(piece_rad*i), markers[1][j]+markers[2][j]*np.sin(piece_rad*i)))
+        neg_bd=np.asarray(neg_bd)
+        plt.scatter(neg_bd[:,0], neg_bd[:,1], c='k', s=10)
 
     '''plot traj'''
     plt.scatter(x_tr[0], y_tr[0], color='b', label="Actual", s=10)
@@ -59,8 +62,8 @@ def get_mu_bar(prev_mu, velocity, omega, angle, dt):
     return prev_mu + m
 
 def get_observed_lm(mu_bar, global_lm):
-
-    return obs_lm_x, obs_lm_y, obs_lm_radi
+    
+    return global_lm[0]-mu_bar[0,0],global_lm[1]-mu_bar[1,0]
 
 def get_G_t(v, w, angle, dt):
     return np.array([
@@ -171,7 +174,7 @@ if __name__ == "__main__":
         '''prediction step'''
         # mu_bar = get_mu_bar(mu, curr_v, curr_w, prev_theta, dt)
         mu = np.array([ [x_pos_true[0,i]],[y_pos_true[0,i]],[theta_pos_true[0,i]] ])
-        mu_bar += make_noise(Q_t)
+        mu_bar = mu+make_noise(Q_t)
         sigma_bar = (G_t @ sigma @ (G_t.T)) + (V_t @ M_t @ (V_t.T))
 
         '''correction (updating belief based on landmark readings)'''
@@ -179,7 +182,7 @@ if __name__ == "__main__":
         bel_y = mu_bar[1,0]
         bel_theta = mu_bar[2,0]
         # cannot observe all lm !
-        obs_lm_x, obs_lm_y, obs_lm_radi = get_observed_lm(mu, (lm_x, lm_y, lm_radi))
+        obs_lm_x, obs_lm_y = get_observed_lm(mu, (lm_x, lm_y))
         for k in range(len(obs_lm_y)):
             npLikelihood = np.array([])
             list_z_hat = []
@@ -188,7 +191,7 @@ if __name__ == "__main__":
             
             obs_k_x = obs_lm_x[k]
             obs_k_y = obs_lm_y[k]
-            obs_k_radi = obs_lm_radi[k]
+            obs_k_radi = lm_radi[k]
             '''get the sensor measurement'''
             # real_x = x_pos_true[0,i]
             # real_y = y_pos_true[0,i]
@@ -211,11 +214,11 @@ if __name__ == "__main__":
                 # q = (diff_x ** 2) + (diff_y ** 2)
                 z_hat = np.array([ [diff_x],
                                    [diff_y],
-                                   [obs_k_radi] ])
+                                   [m_j_radi] ])
 
-                H_t = np.array([ [-diff_x / np.sqrt(q), -diff_y / np.sqrt(q), 0],
-                                 [diff_y / q, -diff_x / q, -1],
-                                 [0, 0, 1] ])
+                H_t = np.array([ [-1, 0, 0],
+                                 [0, -1, 0],
+                                 [0, 0, 0] ])
                 S_t = (H_t @ sigma_bar @ (H_t.T)) + Q_t
                 likelihood = np.sqrt(np.linalg.det(2*np.pi*S_t)) * math.exp(-0.5*((z_true-z_hat).T)@(np.linalg.inv(S_t))@(z_true-z_hat))
                 npLikelihood = np.append(npLikelihood,likelihood)
