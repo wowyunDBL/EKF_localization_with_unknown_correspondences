@@ -35,7 +35,7 @@ def plot_traj(true_states, belief_states, markers, markers_in_map, index):
     number_of_point=12
     piece_rad = np.pi/(number_of_point/2)
     
-    for j in range( len(markers[0]) ):
+    for j in range( len(markers_in_map[0]) ):
         neg_bd = []
         for i in range(number_of_point):
             neg_bd.append((markers_in_map[0][j]+markers_in_map[2][j]*np.cos(piece_rad*i), markers_in_map[1][j]+markers_in_map[2][j]*np.sin(piece_rad*i)))
@@ -55,7 +55,7 @@ def plot_traj(true_states, belief_states, markers, markers_in_map, index):
     for i in range( len(markers[0]) ):
         plt.plot([ markers[0][i],x_guess[0][index] ],
                 [ markers[1][i],y_guess[0][index] ], color='k')
-
+    plt.title('update times: '+str(index)+'/200', fontsize=20)
     plt.legend()
     plt.show()
 
@@ -77,7 +77,7 @@ def get_observed_lm(mu_bar, global_lm):
         diff_theta = arctan2(diff_y, diff_x) - mu_bar[2]
 
         if diff_theta > -FOV and diff_theta < FOV:
-            if diff_x*diff_x+diff_y*diff_y < 36:
+            if diff_x*diff_x+diff_y*diff_y < 49:
                 obs_lm_x.append( global_lm[0][i])
                 obs_lm_y.append( global_lm[1][i])
                 obs_lm_radi.append( global_lm[2][i])
@@ -127,61 +127,78 @@ def find_second_min(row_index, D, cols):
     return second_min, sm_index
 
 def get_correspondences(P,U):
+    
+    D = dist.cdist(U.T, P.T)
+    print('>>>> start to ICP >>>>')
+    print('dist: ', D)
+    # rows = D.min(axis=1)
+    cols = D.argmin(axis=1)
+    print('match point: ', list(enumerate(cols)))
+
+    for a in range(len(cols)):
+        b=1
+        while a+b < len(cols):
+            if cols[a] == cols[a+b]:
+                print("matched same ref landmarks!")
+                second_min_A,A = find_second_min(a, D, cols)
+                second_min_B,B = find_second_min(a+b, D, cols)
+                if second_min_A>second_min_B:
+                    cols[a+b]=B
+                elif second_min_A<second_min_B:
+                    cols[a]=A
+                print('changed matched point-set: ', list(enumerate(cols)))
+            b+=1
+        
+    Q = np.zeros(U.shape)
+    for (row, col) in enumerate(cols):
+        Q[:,row] = P[:,col]
+
+    return Q, cols
+
+def get_Rt_by_ICP(P,U, robot_xy):
+    print('U: ',U)
     resid_scalar = 50
     count = 0
     while resid_scalar > 1:
         count += 1
-        D = dist.cdist(U.T, P.T)
-        print('>>>> start to ICP >>>>')
-        print('dist: ', D)
-        # rows = D.min(axis=1)
-        cols = D.argmin(axis=1)
-        print('match point: ', list(enumerate(cols)))
+        Q, cols = get_correspondences(P,U)
+        U_bar = np.array([np.average(U, axis=1)])
+        U_bar = U_bar.T
+        Q_bar = np.array([np.average(Q, axis=1)])
+        Q_bar = Q_bar.T
 
-        for a in range(len(cols)):
-            b=1
-            while a+b < len(cols):
-                if cols[a] == cols[a+b]:
-                    print("matched same ref landmarks!")
-                    second_min_A,A = find_second_min(a, D, cols)
-                    second_min_B,B = find_second_min(a+b, D, cols)
-                    if second_min_A>second_min_B:
-                        cols[a+b]=B
-                    elif second_min_A<second_min_B:
-                        cols[a]=A
-                    print('changed matched point-set: ', list(enumerate(cols)))
-                b+=1
-            
-        Q = np.zeros(U.shape)
-        for (row, col) in enumerate(cols):
-            Q[:,row] = P[:,col]
-    return Q
+        X = U-U_bar
+        Y = Q-Q_bar
+        S = X @ Y.T
+        u, s, vh = np.linalg.svd(S)
 
-def get_Rt_by_ICP(P,U, robot_xy):
-    Q = get_correspondences(P,U)
-    U_bar = np.array([np.average(U, axis=1)])
-    U_bar = U_bar.T
-    Q_bar = np.array([np.average(Q, axis=1)])
-    Q_bar = Q_bar.T
+        det = np.linalg.det(vh@u.T)
+        print('det(vh@u.T): ', det)
+        if det>0:
+            tmp = np.array([ [1,0],[0,1] ])
+        else: 
+            tmp = np.array([ [1,0],[0,-1] ])
+        R = vh @ tmp @ u.T
+        t = Q_bar-U_bar
+        print('R: ', R)
+        print('t: ', t, Q_bar, U_bar)
+        U_new = R@X + U_bar+t
+        robot_xy_decentral = robot_xy-U_bar
+        robot_xy_new = R @ robot_xy_decentral + (U_bar+t)
 
-    X = U-U_bar
-    Y = Q-Q_bar
-    S = X @ Y.T
-    u, s, vh = np.linalg.svd(S)
+        # calculate residuals
+        residuals = Q-U_new
+        residuals = np.absolute(residuals)
+        resid_scalar = residuals.sum()
+        print("residual = ",resid_scalar)
+        U = U_new
+        robot_xy = np.array([[robot_xy_new[0][0]],[robot_xy_new[1][0]]])
+        print("iteration time: ", count)
+        if count>4:
+            print("iterate over 5 times!!")
+            break
 
-    det = np.linalg.det(vh@u.T)
-    print('det(vh@u.T): ', det)
-    if det>0:
-        tmp = np.array([ [1,0],[0,1] ])
-    else: 
-        tmp = np.array([ [1,0],[0,-1] ])
-    R = vh @ tmp @ u.T
-    t = Q_bar-U_bar
-    U_new = R@X + U_bar+t
-    robot_xy_decentral = robot_xy-U_bar
-    robot_xy_new = R @ robot_xy_decentral + (U_bar+t)
-
-    return robot_xy_new, R,t, U_new 
+    return robot_xy_new, R,t, Q, cols 
 
 if __name__ == "__main__":
     dt = .1
@@ -203,7 +220,7 @@ if __name__ == "__main__":
     
     '''command velocity'''
     v_c = 1 + 0.5*cos(2*np.pi*(0.2)*t)
-    omg_c = -0.2 + 2*cos(2*np.pi*(0.2)*t)
+    omg_c = -0.2 + 2*cos(2*np.pi*(1.2)*t)
     '''noise in the command velocities (translational and rotational)'''
     alpha = np.array([.1, .01, .01, .1])
     alpha_1, alpha_2, alpha_3, alpha_4 = alpha
@@ -211,7 +228,7 @@ if __name__ == "__main__":
     '''landmarks'''
     lm_x = [6,-7,6,2,3,5]
     lm_y = [4,8,-4,7,6,5]
-    lm_radi = [0.2, 0.5, 0.3]
+    lm_radi = [0.2, 0.5, 0.3, 0.2, 0.5, 0.3]
     assert (len(lm_x)==len(lm_y))
     '''std deviation of range and bearing sensor noise for each landmark'''
     std_dev_x = .1
@@ -222,14 +239,14 @@ if __name__ == "__main__":
                      [0, std_dev_y, 0],
                      [0, 0, std_dev_radi] ] )
 
-    '''ground truth
-    x_pos_true = np.load('.npy')
-    y_pos_true = np.zeros(t.shape)
-    theta_pos_true = np.zeros(t.shape)'''
-    x_pos_true = np.zeros(t.shape)
-    y_pos_true = np.zeros(t.shape)
-    theta_pos_true = np.zeros(t.shape)
-    '''set ground truth data by calculation'''
+    '''ground truth'''
+    x_pos_true = np.load('/home/ncslaber/class_material/EKF_localization_with_unknown_correspondences/data_ground_truth/x_pos_true.npy')
+    y_pos_true = np.load('/home/ncslaber/class_material/EKF_localization_with_unknown_correspondences/data_ground_truth/y_pos_true.npy')
+    theta_pos_true = np.load('/home/ncslaber/class_material/EKF_localization_with_unknown_correspondences/data_ground_truth/theta_pos_true.npy')
+    # x_pos_true = np.zeros(t.shape)
+    # y_pos_true = np.zeros(t.shape)
+    # theta_pos_true = np.zeros(t.shape)
+    '''set ground truth data by calculation
     x_pos_true[0,0] = -5
     y_pos_true[0,0] = -3
     theta_pos_true[0,0] = 0.5*np.pi
@@ -246,10 +263,11 @@ if __name__ == "__main__":
         x_pos_true[0, timestep] = next_state[0]
         y_pos_true[0, timestep] = next_state[1]
         theta_pos_true[0, timestep] = next_state[2]
-    # plot_traj((x_pos_true, y_pos_true, theta_pos_true), (x_pos_true, y_pos_true), (lm_x, lm_y))
-    np.save('', x_pos_true)
-    np.save('', y_pos_true)
-    np.save('', theta_pos_true)
+    np.save('/home/ncslaber/class_material/EKF_localization_with_unknown_correspondences/data_ground_truth/x_pos_true', x_pos_true)
+    np.save('/home/ncslaber/class_material/EKF_localization_with_unknown_correspondences/data_ground_truth/y_pos_true', y_pos_true)
+    np.save('/home/ncslaber/class_material/EKF_localization_with_unknown_correspondences/data_ground_truth/theta_pos_true', theta_pos_true)'''
+    # np.save('/home/ncslaber/class_material/EKF_localization_with_unknown_correspondences/data_ground_truth/theta_pos_true', velocity)
+    # np.save('/home/ncslaber/class_material/EKF_localization_with_unknown_correspondences/data_ground_truth/theta_pos_true', omega)
 
     '''run KF'''
     mu = np.array([ [mu_x[0,0]],[mu_y[0,0]],[mu_theta[0,0]] ])
@@ -278,14 +296,17 @@ if __name__ == "__main__":
         obs_lm_x, obs_lm_y, obs_lm_radi= get_observed_lm(mu_bar, (lm_x, lm_y, lm_radi))
         
         ''' find correspondence by ICP '''
-        P = np.vstack((lm_x, lm_y))
-        U = np.vstack((obs_lm_x, obs_lm_y))
-        robot_xy = np.array([ [real_x],
+        if len(obs_lm_x) != 0:
+            real_x = x_pos_true[0,i]
+            real_y = y_pos_true[0,i]
+            real_tehta = theta_pos_true[0,i]
+            P = np.vstack((lm_x, lm_y))
+            U = np.vstack((obs_lm_x, obs_lm_y))
+            robot_xy = np.array([ [real_x],
                                 [real_y] ])
-        robot_xy_new,R,t,U_new = get_Rt_by_ICP(P,U, robot_xy)
-        print("difference btw mu_bar and robot_xy_new: ", mu_bar, robot_xy_new)
-
-        for k in range(len(U_new)):
+            robot_xy_new,R,t,Q, cols = get_Rt_by_ICP(P,U, robot_xy)
+        
+        for k in range(len(obs_lm_x)):
             npLikelihood = np.array([])
             list_z_hat = []
             list_S_t = []
@@ -296,9 +317,6 @@ if __name__ == "__main__":
             obs_k_radi = obs_lm_radi[k]
             
             '''get the sensor measurement'''
-            real_x = x_pos_true[0,i]
-            real_y = y_pos_true[0,i]
-            real_tehta = theta_pos_true[0,i]
             diff_x = obs_k_x - real_x
             diff_y = obs_k_y - real_y
             q = (diff_x ** 2) + (diff_y ** 2)
@@ -309,44 +327,50 @@ if __name__ == "__main__":
             
             # get_nearby_tree
 
-            for j in range(len(lm_y)):
-                m_j_x = lm_x[j]
-                m_j_y = lm_y[j]
-                m_j_radi = lm_radi[j]
-                                              
-                '''likelihood'''
-                diff_x = m_j_x - bel_x
-                diff_y = m_j_y - bel_y
-                q = (diff_x ** 2) + (diff_y ** 2)
-                z_hat = np.array([ [np.sqrt(q)],
-                                    [arctan2(diff_y, diff_x) - bel_theta],
-                                    [m_j_radi] ])
-                H_t = np.array([ [-diff_x / np.sqrt(q), -diff_y / np.sqrt(q), 0],
-                                 [diff_y / q, -diff_x / q, -1],
-                                 [0,0,0] ])
-                S_t = (H_t @ sigma_bar @ (H_t.T)) + Q_t
-                likelihood = np.sqrt(np.linalg.det(2*np.pi*S_t)) * math.exp(-0.5*((z_true-z_hat).T)@(np.linalg.inv(S_t))@(z_true-z_hat))
-                npLikelihood = np.append(npLikelihood,likelihood)
-                
-                list_z_hat.append(z_hat)
-                list_S_t.append(S_t)
-                list_H_t.append(H_t)
+            m_j_x = lm_x[cols[k]]
+            m_j_y = lm_y[cols[k]]
+            m_j_radi = lm_radi[cols[k]]
+                                            
+            '''likelihood'''
+            diff_x = m_j_x - bel_x
+            diff_y = m_j_y - bel_y
+            q = (diff_x ** 2) + (diff_y ** 2)
+            z_hat = np.array([ [np.sqrt(q)],
+                                [arctan2(diff_y, diff_x) - bel_theta],
+                                [m_j_radi] ])
+            H_t = np.array([ [-diff_x / np.sqrt(q), -diff_y / np.sqrt(q), 0],
+                                [diff_y / q, -diff_x / q, -1],
+                                [0,0,0] ])
+            S_t = (H_t @ sigma_bar @ (H_t.T)) + Q_t
+            # likelihood = np.sqrt(np.linalg.det(2*np.pi*S_t)) * math.exp(-0.5*((z_true-z_hat).T)@(np.linalg.inv(S_t))@(z_true-z_hat))
+            # npLikelihood = np.append(npLikelihood,likelihood)
+            
+            # list_z_hat.append(z_hat)
+            # list_S_t.append(S_t)
+            # list_H_t.append(H_t)
 
             '''maximum likelihood'''
-            maxLikelihood = npLikelihood.argmax()
-            H_t = list_H_t.pop(maxLikelihood)
-            S_t = list_S_t.pop(maxLikelihood)
-            z_hat = list_z_hat.pop(maxLikelihood)
+            # maxLikelihood = npLikelihood.argmax()
+            # H_t = list_H_t.pop(maxLikelihood)
+            # S_t = list_S_t.pop(maxLikelihood)
+            # z_hat = list_z_hat.pop(maxLikelihood)
             '''kalman gain and update belief'''
             K_t = sigma_bar @ (H_t.T) @ np.linalg.inv(S_t)
             mu_bar = mu_bar+K_t@(z_true-z_hat)
             sigma_bar = (np.identity(sigma_bar.shape[0])-(K_t @ H_t)) @ sigma_bar
+
         '''update belief'''
         mu = mu_bar
         sigma = sigma_bar
         mu_x[0 , i] = mu[0 , 0]
         mu_y[0 , i] = mu[1 , 0]
         mu_theta[0 , i] = mu[2 , 0]
+
+        if len(obs_lm_x) != 0:
+            print("difference btw mu_bar and robot_xy_new: ", mu_bar, robot_xy_new)
+            tmp = (mu_bar[:2,0] - robot_xy_new[:,0])
+            # if tmp[0]*tmp[0] + tmp[1]*tmp[1] > 0.5: 
+            plot_traj((x_pos_true, y_pos_true, theta_pos_true), (mu_x, mu_y), (obs_lm_x, obs_lm_y, obs_lm_radi),(lm_x,lm_y,lm_radi),i) 
         
         if i%50 == 0:
             plot_traj((x_pos_true, y_pos_true, theta_pos_true), (mu_x, mu_y), (obs_lm_x, obs_lm_y, obs_lm_radi),(lm_x,lm_y,lm_radi),i) 

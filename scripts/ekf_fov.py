@@ -19,14 +19,14 @@ from scipy.io import loadmat
 
 import sys
 
-def plot_traj(true_states, belief_states, markers, markers_in_map, index):
+def plot_traj(true_states, belief_states, markers, markers_in_map, index, update_times):
     x_tr, y_tr, th_tr = true_states
     x_guess, y_guess = belief_states
 
     radius = 0.5
     
     world_bounds = [-10,10]
-    fig, ax = plt.subplots(figsize=(10,10),dpi=120)
+    fig, ax = plt.subplots(figsize=(10,10),dpi=80)
     ax = plt.axes(xlim=world_bounds, ylim=world_bounds)
     ax.set_aspect('equal')
 
@@ -55,8 +55,8 @@ def plot_traj(true_states, belief_states, markers, markers_in_map, index):
     for i in range( len(markers[0]) ):
         plt.plot([ markers[0][i],x_guess[0][index] ],
                 [ markers[1][i],y_guess[0][index] ], color='k')
-
-    plt.legend()
+    plt.title('update times: '+str(update_times)+'/200', fontsize=20)
+    plt.legend(fontsize=20)
     plt.show()
 
 def get_mu_bar(prev_mu, velocity, omega, angle, dt):
@@ -133,7 +133,7 @@ if __name__ == "__main__":
     
     '''command velocity'''
     v_c = 1 + 0.5*cos(2*np.pi*(0.2)*t)
-    omg_c = -0.2 + 2*cos(2*np.pi*(0.6)*t)
+    omg_c = -0.2 + 2*cos(2*np.pi*(1)*t)
     '''noise in the command velocities (translational and rotational)'''
     alpha = np.array([.1, .01, .01, .1])
     alpha_1, alpha_2, alpha_3, alpha_4 = alpha
@@ -177,6 +177,7 @@ if __name__ == "__main__":
     
     '''run KF'''
     mu = np.array([[mu_x[0,0]],[mu_y[0,0]],[mu_theta[0,0]]])
+    update_times = 0
     for i in range(1, t.size):
         print(">>>>new ietration")
         
@@ -200,8 +201,11 @@ if __name__ == "__main__":
         bel_theta = mu_bar[2,0]
         # cannot observe all lm !
         obs_lm_x, obs_lm_y, obs_lm_radi= get_observed_lm(mu_bar, (lm_x, lm_y, lm_radi))
-        
+        flag = 0
         for k in range(len(obs_lm_y)):
+            if flag == 0:
+                update_times += 1
+            flag +=1
             npLikelihood = np.array([])
             list_z_hat = []
             list_S_t = []
@@ -261,4 +265,4 @@ if __name__ == "__main__":
         mu_theta[0 , i] = mu[2 , 0]
         
         if i%50 == 0:
-            plot_traj((x_pos_true, y_pos_true, theta_pos_true), (mu_x, mu_y), (obs_lm_x, obs_lm_y, obs_lm_radi),(lm_x,lm_y,lm_radi),i) 
+            plot_traj((x_pos_true, y_pos_true, theta_pos_true), (mu_x, mu_y), (obs_lm_x, obs_lm_y, obs_lm_radi),(lm_x,lm_y,lm_radi),i, update_times) 
