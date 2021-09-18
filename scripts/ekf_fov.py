@@ -19,7 +19,7 @@ from scipy.io import loadmat
 
 import sys
 
-def plot_traj(true_states, belief_states, markers, markers_map, index):
+def plot_traj(true_states, belief_states, markers, markers_in_map, index):
     x_tr, y_tr, th_tr = true_states
     x_guess, y_guess = belief_states
 
@@ -31,14 +31,14 @@ def plot_traj(true_states, belief_states, markers, markers_map, index):
     ax.set_aspect('equal')
 
     '''plot landmarkers'''
-    plt.scatter(markers_map[0], markers_map[1], marker='X',s=100, color='g', label='ref landmarks')
+    plt.scatter(markers_in_map[0], markers_in_map[1], marker='X',s=100, color='g', label='ref landmarks')
     number_of_point=12
     piece_rad = np.pi/(number_of_point/2)
     
     for j in range( len(markers[0]) ):
         neg_bd = []
         for i in range(number_of_point):
-            neg_bd.append((markers_map[0][j]+markers_map[2][j]*np.cos(piece_rad*i), markers_map[1][j]+markers_map[2][j]*np.sin(piece_rad*i)))
+            neg_bd.append((markers_in_map[0][j]+markers_in_map[2][j]*np.cos(piece_rad*i), markers_in_map[1][j]+markers_in_map[2][j]*np.sin(piece_rad*i)))
         neg_bd=np.asarray(neg_bd)
         plt.scatter(neg_bd[:,0], neg_bd[:,1], c='k', s=10)
 
@@ -52,12 +52,9 @@ def plot_traj(true_states, belief_states, markers, markers_map, index):
                [y_tr[0][index], y_tr[0][index] + radius*sin(th_tr[0][index]) ], color='k' )
 
     '''plot obs lm'''
-    plt.plot([ markers[0][0],x_guess[0][index] ],
-             [ markers[1][0],y_guess[0][index] ], color='k')
-    plt.plot([ markers[0][1],x_guess[0][index] ],
-             [ markers[1][1],y_guess[0][index] ], color='k')
-    # plt.plot([ markers[0][2],x_guess[0][index] ],
-    #          [ markers[1][2],y_guess[0][index] ], color='k')
+    for i in range( len(markers[0]) ):
+        plt.plot([ markers[0][i],x_guess[0][index] ],
+                [ markers[1][i],y_guess[0][index] ], color='k')
 
     plt.legend()
     plt.show()
@@ -70,8 +67,21 @@ def get_mu_bar(prev_mu, velocity, omega, angle, dt):
     return prev_mu + m
 
 def get_observed_lm(mu_bar, global_lm):
-    
-    return global_lm[0][:2],global_lm[1][:2],global_lm[1][:2]
+    obs_lm_x = []
+    obs_lm_y = []
+    obs_lm_radi = []
+    FOV = np.pi/2
+    for i in range( len(global_lm[0]) ):
+        diff_x = global_lm[0][i] - mu_bar[0]
+        diff_y = global_lm[1][i] - mu_bar[1]
+        diff_theta = arctan2(diff_y, diff_x) - mu_bar[2]
+
+        if diff_theta > -FOV and diff_theta < FOV:
+            obs_lm_x.append( global_lm[0][i])
+            obs_lm_y.append( global_lm[1][i])
+            obs_lm_radi.append( global_lm[2][i])
+                
+    return obs_lm_x, obs_lm_y, obs_lm_radi
 
 def get_G_t(v, w, angle, dt):
     return np.array([
@@ -166,7 +176,7 @@ if __name__ == "__main__":
     # plot_traj((x_pos_true, y_pos_true, theta_pos_true), (x_pos_true, y_pos_true), (lm_x, lm_y))
     
     '''run KF'''
-    # mu = np.array([[mu_x[0,0]],[mu_y[0,0]],[mu_theta[0,0]]])
+    mu = np.array([[mu_x[0,0]],[mu_y[0,0]],[mu_theta[0,0]]])
     for i in range(1, t.size):
         print(">>>>new ietration")
         
@@ -180,9 +190,8 @@ if __name__ == "__main__":
         M_t = get_M_t(alpha, curr_v, curr_w)
 
         '''prediction step'''
-        # mu_bar = get_mu_bar(mu, curr_v, curr_w, prev_theta, dt)
-        mu = np.array([ [x_pos_true[0,i]],[y_pos_true[0,i]],[theta_pos_true[0,i]] ])
-        mu_bar = mu+make_noise(sigma)
+        mu_bar = get_mu_bar(mu, curr_v, curr_w, prev_theta, dt)
+        # mu = np.array([ [x_pos_true[0,i]],[y_pos_true[0,i]],[theta_pos_true[0,i]] ])
         sigma_bar = (G_t @ sigma @ (G_t.T)) + (V_t @ M_t @ (V_t.T))
 
         '''correction (updating belief based on landmark readings)'''
@@ -190,7 +199,7 @@ if __name__ == "__main__":
         bel_y = mu_bar[1,0]
         bel_theta = mu_bar[2,0]
         # cannot observe all lm !
-        obs_lm_x, obs_lm_y, obs_lm_radi= get_observed_lm(mu, (lm_x, lm_y, lm_radi))
+        obs_lm_x, obs_lm_y, obs_lm_radi= get_observed_lm(mu_bar, (lm_x, lm_y, lm_radi))
         
         for k in range(len(obs_lm_y)):
             npLikelihood = np.array([])
@@ -252,4 +261,4 @@ if __name__ == "__main__":
         mu_theta[0 , i] = mu[2 , 0]
         
         if i%50 == 0:
-            plot_traj((x_pos_true, y_pos_true, theta_pos_true), (mu_x, mu_y), (obs_lm_x, obs_lm_y, lm_radi),(lm_x,lm_y,lm_radi),i) 
+            plot_traj((x_pos_true, y_pos_true, theta_pos_true), (mu_x, mu_y), (obs_lm_x, obs_lm_y, obs_lm_radi),(lm_x,lm_y,lm_radi),i) 
