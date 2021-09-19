@@ -7,6 +7,23 @@ cd build
 cmake ..
 make
 ```
+
+## tree
+```bash
+├── scripts
+│   ├── ekf_with_icp_unknown.py
+│   └── ekf_with_mixLikelihood.py
+└── src
+    └── EKF_localization.h
+```
+
+## Usage
+#### find correspondence by ICP
+```bash
+python ekf_with_icp_unknown.py
+```
+plz save the trajectory in ./data_ground_truth and ./data_predicted
+
 ## Eigen
 [Eigen](http://eigen.tuxfamily.org/dox-devel/group__QuickRefPage.html)
 * Only need to include header file: `#include <Eigen/Dense>`

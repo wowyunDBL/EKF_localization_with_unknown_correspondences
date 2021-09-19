@@ -19,13 +19,14 @@ from scipy.io import loadmat
 
 import sys
 
-def plot_traj(true_states, belief_states, markers, markers_in_map, index):
+def plot_traj(true_states, belief_states, markers, markers_in_map, index, np_z_hat, np_z_true, bel_pose, real_pose):
     x_tr, y_tr, th_tr = true_states
-    x_guess, y_guess = belief_states
+    x_guess, y_guess, theta_guess = belief_states
+    # x_tr_lm, y_tr_lm, th_tr_lm = lm_states
 
     radius = 0.5
     
-    world_bounds = [-10,10]
+    world_bounds = [-15,10]
     fig, ax = plt.subplots(figsize=(10,10),dpi=120)
     ax = plt.axes(xlim=world_bounds, ylim=world_bounds)
     ax.set_aspect('equal')
@@ -44,20 +45,69 @@ def plot_traj(true_states, belief_states, markers, markers_in_map, index):
 
     '''plot traj'''
     plt.scatter(x_tr[0], y_tr[0], color='b', label="Actual", s=10)
-    plt.scatter(x_guess[0], y_guess[0], color='r', label="Predicted", s=10)
-
+    plt.scatter(x_guess[0][:index], y_guess[0][:index], color='r', label="Predicted", s=10)
+      
     '''plot final state'''
-    plt.scatter(x_tr[0][index],y_tr[0][index], s=500, color='y', ec='k')
+    plt.scatter(x_tr[0][index],y_tr[0][index], s=300, color='lightyellow', ec='k', label='Actual pose')
     plt.plot( [x_tr[0][index], x_tr[0][index] + radius*cos(th_tr[0][index]) ], 
                [y_tr[0][index], y_tr[0][index] + radius*sin(th_tr[0][index]) ], color='k' )
+    plt.scatter(x_guess[0][index],y_guess[0][index], s=500, color='y', ec='k', label='Predicted pose')
+    plt.plot( [x_guess[0][index], x_guess[0][index] + radius*cos(theta_guess[0][index]) ], 
+              [y_guess[0][index], y_guess[0][index] + radius*sin(theta_guess[0][index]) ], color='k' )
+    # plt.scatter(x_tr_lm[0][index],y_tr_lm[0][index], s=400, color='lightblue', ec='k', label='landmark pose')
+    # plt.plot( [x_tr_lm[0][index], x_tr_lm[0][index] + radius*cos(th_tr_lm[0][index]) ], 
+    #           [y_tr_lm[0][index], y_tr_lm[0][index] + radius*sin(th_tr_lm[0][index]) ], color='k' )
 
-    '''plot obs lm'''
+    '''plot observation z'''
+    plot_measured_landmarks(np_z_hat, np_z_true, bel_pose, real_pose)
+
+    '''plot obs lm
     for i in range( len(markers[0]) ):
-        plt.plot([ markers[0][i],x_guess[0][index] ],
-                [ markers[1][i],y_guess[0][index] ], color='k')
-    plt.title('update times: '+str(index)+'/200', fontsize=20)
-    plt.legend()
+        plt.plot([ markers[0][i],x_tr[0][index] ],
+                [ markers[1][i],y_tr[0][index] ], color='k')'''
+    
+    plt.title('update times: '+str(index)+'/200', fontsize=25)
+    plt.yticks(fontsize=20)
+    plt.xticks(fontsize=20)
+    plt.legend(fontsize=15)
     plt.show()
+
+def plot_measured_landmarks(np_z_hat, np_z_true, bel_pose, real_pose):
+    bel_x, bel_y, bel_theta = bel_pose
+    real_x, real_y, real_theta = real_pose
+    radius = 0.5
+
+    # world_bounds = [-15,10]
+    # fig, ax = plt.subplots(figsize=(10,10),dpi=120)
+    # ax = plt.axes(xlim=world_bounds, ylim=world_bounds)
+    # ax.set_aspect('equal')
+
+    '''plot state'''
+    plt.scatter(bel_x, bel_y, s=300, color='lightblue', ec='k', label='z_hat pose')
+    plt.plot( [bel_x, bel_x + radius*cos(bel_theta) ], 
+               [bel_y, bel_y + radius*sin(bel_theta) ], color='k' )
+    
+    '''plot observation'''
+    np_z_hat = np.reshape(np_z_hat, (-1,3))
+    np_z_true = np.reshape(np_z_true, (-1,3))
+    for i in range( np_z_true.shape[0] ):
+        r_x = np_z_hat[i][0] * cos(np_z_hat[i][1])
+        r_y = np_z_hat[i][0] * sin(np_z_hat[i][1])
+        wr_x =  cos(bel_theta)*r_x - sin(bel_theta)*r_y
+        wr_x += bel_x
+        wr_y = sin(bel_theta)*r_x + cos(bel_theta)*r_y
+        wr_y += bel_y
+        plt.plot([ bel_x,wr_x ],
+                 [ bel_y,wr_y ], color='k', linestyle='--', label='predi_observing')
+
+        r_x = np_z_true[i][0] * cos(np_z_true[i][1])
+        r_y = np_z_true[i][0] * sin(np_z_true[i][1])
+        wr_x =  cos(real_theta)*r_x - sin(real_theta)*r_y
+        wr_x += real_x
+        wr_y = sin(real_theta)*r_x + cos(real_theta)*r_y
+        wr_y += real_y
+        plt.plot([ real_x,wr_x ],
+                 [ real_y,wr_y ], color='b', linestyle='-', label='real_observing')
 
 def get_mu_bar(prev_mu, velocity, omega, angle, dt):
     ratio = velocity/omega
@@ -77,7 +127,7 @@ def get_observed_lm(mu_bar, global_lm):
         diff_theta = arctan2(diff_y, diff_x) - mu_bar[2]
 
         if diff_theta > -FOV and diff_theta < FOV:
-            if diff_x*diff_x+diff_y*diff_y < 49:
+            if diff_x*diff_x+diff_y*diff_y < 64:
                 obs_lm_x.append( global_lm[0][i])
                 obs_lm_y.append( global_lm[1][i])
                 obs_lm_radi.append( global_lm[2][i])
@@ -200,6 +250,27 @@ def get_Rt_by_ICP(P,U, robot_xy):
 
     return robot_xy_new, R,t, Q, cols 
 
+def get_landmark():
+    ''' load landmark map 
+    directory = '/home/ncslaber/109-2/210725_NTU_leftAreaLibrary/'
+    bag_name = 'ntu_test3_2021-07-25-18-23-39/'
+    file_path_map = directory+bag_name
+    center_utm_ref = np.load(file_path_map+'center_utm_ref.npy')'''
+    lm_x = [-7,2,3,5,6,6] 
+    lm_y = [8,7,6,5,4,-4] 
+    lm_radi = [0.2, 0.5, 0.3, 0.2, 0.5, 0.3]
+    return lm_x, lm_y, lm_radi
+
+def get_noise_landmark_xy(z_true, robot_pose):
+    (real_x, real_y, real_tehta) = robot_pose
+    r_x = z_true[0][0] * cos(z_true[1][0])
+    r_y = z_true[0][0] * sin(z_true[1][0])
+    wr_x =  cos(real_tehta)*r_x - sin(real_tehta)*r_y
+    wr_x += real_x
+    wr_y = sin(real_tehta)*r_x + cos(real_tehta)*r_y
+    wr_y += real_y
+    return wr_x, wr_y
+
 if __name__ == "__main__":
     dt = .1
     t = np.arange(0, 20+dt, dt)
@@ -226,14 +297,12 @@ if __name__ == "__main__":
     alpha_1, alpha_2, alpha_3, alpha_4 = alpha
 
     '''landmarks'''
-    lm_x = [6,-7,6,2,3,5]
-    lm_y = [4,8,-4,7,6,5]
-    lm_radi = [0.2, 0.5, 0.3, 0.2, 0.5, 0.3]
+    lm_x, lm_y, lm_radi = get_landmark()
     assert (len(lm_x)==len(lm_y))
     '''std deviation of range and bearing sensor noise for each landmark'''
-    std_dev_x = .1
+    std_dev_x = .05
     std_dev_y = .05
-    std_dev_radi = .5
+    std_dev_radi = .05
     '''uncertainty due to measurement noise'''
     Q_t = np.array([ [std_dev_x, 0, 0],
                      [0, std_dev_y, 0],
@@ -266,9 +335,7 @@ if __name__ == "__main__":
     np.save('/home/ncslaber/class_material/EKF_localization_with_unknown_correspondences/data_ground_truth/x_pos_true', x_pos_true)
     np.save('/home/ncslaber/class_material/EKF_localization_with_unknown_correspondences/data_ground_truth/y_pos_true', y_pos_true)
     np.save('/home/ncslaber/class_material/EKF_localization_with_unknown_correspondences/data_ground_truth/theta_pos_true', theta_pos_true)'''
-    # np.save('/home/ncslaber/class_material/EKF_localization_with_unknown_correspondences/data_ground_truth/theta_pos_true', velocity)
-    # np.save('/home/ncslaber/class_material/EKF_localization_with_unknown_correspondences/data_ground_truth/theta_pos_true', omega)
-
+    
     '''run KF'''
     mu = np.array([ [mu_x[0,0]],[mu_y[0,0]],[mu_theta[0,0]] ])
     for i in range(1, t.size):
@@ -292,20 +359,18 @@ if __name__ == "__main__":
         bel_x = mu_bar[0,0]
         bel_y = mu_bar[1,0]
         bel_theta = mu_bar[2,0]
-        # cannot observe all lm !
-        obs_lm_x, obs_lm_y, obs_lm_radi= get_observed_lm(mu_bar, (lm_x, lm_y, lm_radi))
+
+        '''measured landmarks'''
+        real_x = x_pos_true[0,i]
+        real_y = y_pos_true[0,i]
+        real_tehta = theta_pos_true[0,i]
+        obs_lm_x, obs_lm_y, obs_lm_radi= get_observed_lm([real_x,real_y,real_tehta], (lm_x, lm_y, lm_radi))
         
-        ''' find correspondence by ICP '''
-        if len(obs_lm_x) != 0:
-            real_x = x_pos_true[0,i]
-            real_y = y_pos_true[0,i]
-            real_tehta = theta_pos_true[0,i]
-            P = np.vstack((lm_x, lm_y))
-            U = np.vstack((obs_lm_x, obs_lm_y))
-            robot_xy = np.array([ [real_x],
-                                [real_y] ])
-            robot_xy_new,R,t,Q, cols = get_Rt_by_ICP(P,U, robot_xy)
-        
+        '''generate noise measurement'''
+        np_z_true=np.array([[],[],[]])
+        np_z_hat=np.array([[],[],[]])
+        np_obs_x_m_noise=np.array([])
+        np_obs_y_m_noise=np.array([])
         for k in range(len(obs_lm_x)):
             npLikelihood = np.array([])
             list_z_hat = []
@@ -324,9 +389,25 @@ if __name__ == "__main__":
                                 [arctan2(diff_y, diff_x) - real_tehta],
                                 [obs_k_radi] ])
             z_true += make_noise(Q_t)
-            
-            # get_nearby_tree
 
+            '''save real measured data'''
+            np_z_true=np.append(np_z_true, z_true)
+            obs_lm_x_noise, obs_lm_y_noise = get_noise_landmark_xy(z_true, (real_x, real_y, real_tehta))
+            np_obs_x_m_noise=np.append(np_obs_x_m_noise,obs_lm_x_noise)
+            np_obs_y_m_noise=np.append(np_obs_y_m_noise,obs_lm_y_noise)
+        
+        ''' find correspondence by ICP '''
+        if len(obs_lm_x) != 0:
+            P = np.vstack((lm_x, lm_y))
+            print('P: ',P)
+            U = np.vstack((np_obs_x_m_noise, np_obs_y_m_noise))
+            print('U: ',U)
+            robot_xy = np.array([ [real_x],
+                                  [real_y] ])
+            robot_xy_new,R,t,Q, cols = get_Rt_by_ICP(P,U, robot_xy)
+        
+            # get_nearby_tree
+        for k in range(len(obs_lm_x)):
             m_j_x = lm_x[cols[k]]
             m_j_y = lm_y[cols[k]]
             m_j_radi = lm_radi[cols[k]]
@@ -342,6 +423,9 @@ if __name__ == "__main__":
                                 [diff_y / q, -diff_x / q, -1],
                                 [0,0,0] ])
             S_t = (H_t @ sigma_bar @ (H_t.T)) + Q_t
+
+            '''save estimated measured data'''
+            np_z_hat=np.append(np_z_hat,z_hat)
             # likelihood = np.sqrt(np.linalg.det(2*np.pi*S_t)) * math.exp(-0.5*((z_true-z_hat).T)@(np.linalg.inv(S_t))@(z_true-z_hat))
             # npLikelihood = np.append(npLikelihood,likelihood)
             
@@ -366,11 +450,13 @@ if __name__ == "__main__":
         mu_y[0 , i] = mu[1 , 0]
         mu_theta[0 , i] = mu[2 , 0]
 
-        if len(obs_lm_x) != 0:
-            print("difference btw mu_bar and robot_xy_new: ", mu_bar, robot_xy_new)
-            tmp = (mu_bar[:2,0] - robot_xy_new[:,0])
-            # if tmp[0]*tmp[0] + tmp[1]*tmp[1] > 0.5: 
-            plot_traj((x_pos_true, y_pos_true, theta_pos_true), (mu_x, mu_y), (obs_lm_x, obs_lm_y, obs_lm_radi),(lm_x,lm_y,lm_radi),i) 
+        # if len(obs_lm_x) != 0:
+        #     print("difference btw mu_bar and robot_xy_new: ", mu_bar, robot_xy_new)
+        #     tmp = (mu_bar[:2,0] - robot_xy_new[:,0])
+        #     plot_traj((x_pos_true, y_pos_true, theta_pos_true), (mu_x, mu_y, mu_theta), (obs_lm_x, obs_lm_y, obs_lm_radi),(lm_x,lm_y,lm_radi),i, \
+        #                 np_z_hat, np_z_true, (bel_x, bel_y, bel_theta), (real_x, real_y, real_tehta)) 
+            
         
         if i%50 == 0:
-            plot_traj((x_pos_true, y_pos_true, theta_pos_true), (mu_x, mu_y), (obs_lm_x, obs_lm_y, obs_lm_radi),(lm_x,lm_y,lm_radi),i) 
+            plot_traj((x_pos_true, y_pos_true, theta_pos_true), (mu_x, mu_y, mu_theta), (obs_lm_x, obs_lm_y, obs_lm_radi),(lm_x,lm_y,lm_radi),i, \
+                        np_z_hat, np_z_true, (bel_x, bel_y, bel_theta), (real_x, real_y, real_tehta)) 
