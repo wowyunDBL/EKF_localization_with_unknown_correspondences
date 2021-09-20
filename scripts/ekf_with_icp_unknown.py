@@ -458,7 +458,6 @@ if __name__ == "__main__":
 
                     likelihood = np.sqrt(np.linalg.det(2*np.pi*S_t)) * math.exp(-0.5*((z_true-z_hat).T)@(np.linalg.inv(S_t))@(z_true-z_hat))
                     npLikelihood = np.append(npLikelihood,likelihood)
-                    
                     list_z_hat.append(z_hat)
                     list_S_t.append(S_t)
                     list_H_t.append(H_t)
