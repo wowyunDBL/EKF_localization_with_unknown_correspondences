@@ -109,6 +109,29 @@ def plot_measured_landmarks(np_z_hat, np_z_true, bel_pose, real_pose):
         plt.plot([ real_x,wr_x ],
                  [ real_y,wr_y ], color='b', linestyle='-', label='real_observing')
 
+def plot_transformed(U, robot_pose):
+    # robot_x, robot_y, robot_theta = robot_pose
+    radius = 0.5
+
+    world_bounds = [-15,10]
+    fig, ax = plt.subplots(figsize=(10,10),dpi=120)
+    ax = plt.axes(xlim=world_bounds, ylim=world_bounds)
+    ax.set_aspect('equal')
+
+    '''plot state'''
+    plt.scatter(robot_pose[0,0], robot_pose[1,0], s=300, color='r', marker="v", label='z_hat pose')
+    # plt.plot( [bel_x, bel_x + radius*cos(bel_theta) ], 
+    #           [bel_y, bel_y + radius*sin(bel_theta) ], color='k' )
+    
+    '''plot transformed observation'''
+    plt.scatter(U[0,:], U[1,:], label='transform landmarks',c='r',s=300, label='transformed lms')
+
+    plt.title('process of transforming ', fontsize=25)
+    plt.yticks(fontsize=20)
+    plt.xticks(fontsize=20)
+    plt.legend(fontsize=15)
+    plt.show()
+    
 def get_mu_bar(prev_mu, velocity, omega, angle, dt):
     ratio = velocity/omega
     m = np.array([[(-ratio*sin(angle))+(ratio*sin(angle+omega*dt))],
@@ -179,7 +202,6 @@ def find_second_min(row_index, D, cols):
 def get_correspondences(P,U):
     
     D = dist.cdist(U.T, P.T)
-    print('>>>> start to ICP >>>>')
     print('dist: ', D)
     # rows = D.min(axis=1)
     cols = D.argmin(axis=1)
@@ -206,10 +228,12 @@ def get_correspondences(P,U):
     return Q, cols
 
 def get_Rt_by_ICP(P,U, robot_xy):
-    print('U: ',U)
     resid_scalar = 50
     count = 0
     while resid_scalar > 1:
+        print('>>>> start to ICP >>>>')
+        print('P: ',P)
+        print('U: ',U)
         count += 1
         Q, cols = get_correspondences(P,U)
         U_bar = np.array([np.average(U, axis=1)])
@@ -231,7 +255,9 @@ def get_Rt_by_ICP(P,U, robot_xy):
         R = vh @ tmp @ u.T
         t = Q_bar-U_bar
         print('R: ', R)
-        print('t: ', t, Q_bar, U_bar)
+        print('t: ', t)
+        print('Q_bar: ', Q_bar)
+        print('U_bar: ', U_bar)
         U_new = R@X + U_bar+t
         robot_xy_decentral = robot_xy-U_bar
         robot_xy_new = R @ robot_xy_decentral + (U_bar+t)
@@ -244,6 +270,10 @@ def get_Rt_by_ICP(P,U, robot_xy):
         U = U_new
         robot_xy = np.array([[robot_xy_new[0][0]],[robot_xy_new[1][0]]])
         print("iteration time: ", count)
+
+        '''plot transformed result'''
+        plot_transformed(U, robot_xy)
+
         if count>4:
             print("iterate over 5 times!!")
             break
@@ -336,7 +366,10 @@ if __name__ == "__main__":
     np.save('/home/ncslaber/class_material/EKF_localization_with_unknown_correspondences/data_ground_truth/y_pos_true', y_pos_true)
     np.save('/home/ncslaber/class_material/EKF_localization_with_unknown_correspondences/data_ground_truth/theta_pos_true', theta_pos_true)'''
     
-    '''run KF'''
+    '''# of observed landmarks'''
+    obs_lm_number = np.zeros(t.shape)
+
+    '''run EKF'''
     mu = np.array([ [mu_x[0,0]],[mu_y[0,0]],[mu_theta[0,0]] ])
     for i in range(1, t.size):
         print(">>>>new ietration")
@@ -364,7 +397,7 @@ if __name__ == "__main__":
         real_x = x_pos_true[0,i]
         real_y = y_pos_true[0,i]
         real_tehta = theta_pos_true[0,i]
-        obs_lm_x, obs_lm_y, obs_lm_radi= get_observed_lm([real_x,real_y,real_tehta], (lm_x, lm_y, lm_radi))
+        obs_lm_x, obs_lm_y, obs_lm_radi= get_observed_lm( [real_x,real_y,real_tehta], (lm_x, lm_y, lm_radi) )
         
         '''generate noise measurement'''
         np_z_true=np.array([[],[],[]])
@@ -397,51 +430,87 @@ if __name__ == "__main__":
             np_obs_y_m_noise=np.append(np_obs_y_m_noise,obs_lm_y_noise)
         
         ''' find correspondence by ICP '''
-        if len(obs_lm_x) != 0:
-            P = np.vstack((lm_x, lm_y))
-            print('P: ',P)
-            U = np.vstack((np_obs_x_m_noise, np_obs_y_m_noise))
-            print('U: ',U)
-            robot_xy = np.array([ [real_x],
-                                  [real_y] ])
-            robot_xy_new,R,t,Q, cols = get_Rt_by_ICP(P,U, robot_xy)
+        if len(obs_lm_x) > 0:
+            if len(obs_lm_x) == 1:
+                ''' find correspondence by maximum likelihood '''
+                P = np.vstack((lm_x, lm_y))
+                U = np.vstack((np_obs_x_m_noise, np_obs_y_m_noise))
+                D = dist.cdist(U.T, P.T)
+                cols = np.where(D<0.8)
+                print('cols: ',cols)
+                for k in range(len(cols)):
+                    
+                    m_j_x = lm_x[cols[k]]
+                    m_j_y = lm_y[cols[k]]
+                    m_j_radi = lm_radi[cols[k]]
+
+                    '''get predict measurement'''
+                    diff_x = m_j_x - bel_x
+                    diff_y = m_j_y - bel_y
+                    q = (diff_x ** 2) + (diff_y ** 2)
+                    z_hat = np.array([ [np.sqrt(q)],
+                                        [arctan2(diff_y, diff_x) - bel_theta],
+                                        [m_j_radi] ])
+                    H_t = np.array([ [-diff_x / np.sqrt(q), -diff_y / np.sqrt(q), 0],
+                                        [diff_y / q, -diff_x / q, -1],
+                                        [0,0,0] ])
+                    S_t = (H_t @ sigma_bar @ (H_t.T)) + Q_t
+
+                    likelihood = np.sqrt(np.linalg.det(2*np.pi*S_t)) * math.exp(-0.5*((z_true-z_hat).T)@(np.linalg.inv(S_t))@(z_true-z_hat))
+                    npLikelihood = np.append(npLikelihood,likelihood)
+                    
+                    list_z_hat.append(z_hat)
+                    list_S_t.append(S_t)
+                    list_H_t.append(H_t)
+
+                '''maximum likelihood'''
+                maxLikelihood = npLikelihood.argmax()
+                H_t = list_H_t.pop(maxLikelihood)
+                S_t = list_S_t.pop(maxLikelihood)
+                z_hat = list_z_hat.pop(maxLikelihood)
+
+                '''save estimated measured data'''
+                np_z_hat=np.append(np_z_hat,z_hat)
+                
+                '''kalman gain and update belief'''
+                K_t = sigma_bar @ (H_t.T) @ np.linalg.inv(S_t)
+                mu_bar = mu_bar+K_t@(z_true-z_hat)
+                sigma_bar = (np.identity(sigma_bar.shape[0])-(K_t @ H_t)) @ sigma_bar
+
+            else:
+                ''' find correspondence by ICP '''
+                P = np.vstack((lm_x, lm_y))
+                
+                U = np.vstack((np_obs_x_m_noise, np_obs_y_m_noise))
+                robot_xy = np.array([ [real_x],
+                                      [real_y] ])
+                robot_xy_new,R,t,Q, cols = get_Rt_by_ICP(P,U, robot_xy)
         
-            # get_nearby_tree
-        for k in range(len(obs_lm_x)):
-            m_j_x = lm_x[cols[k]]
-            m_j_y = lm_y[cols[k]]
-            m_j_radi = lm_radi[cols[k]]
-                                            
-            '''likelihood'''
-            diff_x = m_j_x - bel_x
-            diff_y = m_j_y - bel_y
-            q = (diff_x ** 2) + (diff_y ** 2)
-            z_hat = np.array([ [np.sqrt(q)],
-                                [arctan2(diff_y, diff_x) - bel_theta],
-                                [m_j_radi] ])
-            H_t = np.array([ [-diff_x / np.sqrt(q), -diff_y / np.sqrt(q), 0],
-                                [diff_y / q, -diff_x / q, -1],
-                                [0,0,0] ])
-            S_t = (H_t @ sigma_bar @ (H_t.T)) + Q_t
+                    # get_nearby_tree
+                for k in range(len(obs_lm_x)):
+                    m_j_x = lm_x[cols[k]]
+                    m_j_y = lm_y[cols[k]]
+                    m_j_radi = lm_radi[cols[k]]
+                                                    
+                    '''get predict measurement'''
+                    diff_x = m_j_x - bel_x
+                    diff_y = m_j_y - bel_y
+                    q = (diff_x ** 2) + (diff_y ** 2)
+                    z_hat = np.array([ [np.sqrt(q)],
+                                        [arctan2(diff_y, diff_x) - bel_theta],
+                                        [m_j_radi] ])
+                    H_t = np.array([ [-diff_x / np.sqrt(q), -diff_y / np.sqrt(q), 0],
+                                        [diff_y / q, -diff_x / q, -1],
+                                        [0,0,0] ])
+                    S_t = (H_t @ sigma_bar @ (H_t.T)) + Q_t
 
-            '''save estimated measured data'''
-            np_z_hat=np.append(np_z_hat,z_hat)
-            # likelihood = np.sqrt(np.linalg.det(2*np.pi*S_t)) * math.exp(-0.5*((z_true-z_hat).T)@(np.linalg.inv(S_t))@(z_true-z_hat))
-            # npLikelihood = np.append(npLikelihood,likelihood)
-            
-            # list_z_hat.append(z_hat)
-            # list_S_t.append(S_t)
-            # list_H_t.append(H_t)
-
-            '''maximum likelihood'''
-            # maxLikelihood = npLikelihood.argmax()
-            # H_t = list_H_t.pop(maxLikelihood)
-            # S_t = list_S_t.pop(maxLikelihood)
-            # z_hat = list_z_hat.pop(maxLikelihood)
-            '''kalman gain and update belief'''
-            K_t = sigma_bar @ (H_t.T) @ np.linalg.inv(S_t)
-            mu_bar = mu_bar+K_t@(z_true-z_hat)
-            sigma_bar = (np.identity(sigma_bar.shape[0])-(K_t @ H_t)) @ sigma_bar
+                    '''save estimated measured data'''
+                    np_z_hat=np.append(np_z_hat,z_hat)
+                    
+                    '''kalman gain and update belief'''
+                    K_t = sigma_bar @ (H_t.T) @ np.linalg.inv(S_t)
+                    mu_bar = mu_bar+K_t@(z_true-z_hat)
+                    sigma_bar = (np.identity(sigma_bar.shape[0])-(K_t @ H_t)) @ sigma_bar
 
         '''update belief'''
         mu = mu_bar
@@ -449,6 +518,7 @@ if __name__ == "__main__":
         mu_x[0 , i] = mu[0 , 0]
         mu_y[0 , i] = mu[1 , 0]
         mu_theta[0 , i] = mu[2 , 0]
+        obs_lm_number[0 , i] = len(np_z_hat)/3
 
         # if len(obs_lm_x) != 0:
         #     print("difference btw mu_bar and robot_xy_new: ", mu_bar, robot_xy_new)
@@ -460,3 +530,10 @@ if __name__ == "__main__":
         if i%50 == 0:
             plot_traj((x_pos_true, y_pos_true, theta_pos_true), (mu_x, mu_y, mu_theta), (obs_lm_x, obs_lm_y, obs_lm_radi),(lm_x,lm_y,lm_radi),i, \
                         np_z_hat, np_z_true, (bel_x, bel_y, bel_theta), (real_x, real_y, real_tehta)) 
+    
+    np.save('/home/ncslaber/class_material/EKF_localization_with_unknown_correspondences/data_ground_truth/mu_x', mu_x)
+    np.save('/home/ncslaber/class_material/EKF_localization_with_unknown_correspondences/data_ground_truth/mu_y', mu_y)
+    np.save('/home/ncslaber/class_material/EKF_localization_with_unknown_correspondences/data_ground_truth/mu_theta', mu_theta)
+    np.save('/home/ncslaber/class_material/EKF_localization_with_unknown_correspondences/data_ground_truth/obs_lm_number', obs_lm_number)
+    np.save('/home/ncslaber/class_material/EKF_localization_with_unknown_correspondences/data_ground_truth/obs_lm_vector', np_z_true)
+    
