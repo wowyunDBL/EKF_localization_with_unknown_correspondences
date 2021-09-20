@@ -88,10 +88,11 @@ def plot_measured_landmarks(np_z_hat, np_z_true, bel_pose, real_pose):
                [bel_y, bel_y + radius*sin(bel_theta) ], color='k' )
     
     '''plot observation'''
-    
-    for i in range( np_z_true.shape[1] ):
-        r_x = np_z_hat[0][i] * cos(np_z_hat[1][i])
-        r_y = np_z_hat[0][i] * sin(np_z_hat[1][i])
+    # np_z_hat = np.reshape(np_z_hat, (-1,3))
+    # np_z_true = np.reshape(np_z_true, (-1,3))
+    for i in range( np_z_true.shape[0] ):
+        r_x = np_z_hat[i][0] * cos(np_z_hat[i][1])
+        r_y = np_z_hat[i][0] * sin(np_z_hat[i][1])
         wr_x =  cos(bel_theta)*r_x - sin(bel_theta)*r_y
         wr_x += bel_x
         wr_y = sin(bel_theta)*r_x + cos(bel_theta)*r_y
@@ -99,8 +100,8 @@ def plot_measured_landmarks(np_z_hat, np_z_true, bel_pose, real_pose):
         plt.plot([ bel_x,wr_x ],
                  [ bel_y,wr_y ], color='k', linestyle='--', label='predi_observing')
 
-        r_x = np_z_true[0][i] * cos(np_z_true[1][i])
-        r_y = np_z_true[0][i] * sin(np_z_true[1][i])
+        r_x = np_z_true[i][0] * cos(np_z_true[i][1])
+        r_y = np_z_true[i][0] * sin(np_z_true[i][1])
         wr_x =  cos(real_theta)*r_x - sin(real_theta)*r_y
         wr_x += real_x
         wr_y = sin(real_theta)*r_x + cos(real_theta)*r_y
@@ -150,10 +151,10 @@ def get_observed_lm(mu_bar, global_lm):
         diff_theta = arctan2(diff_y, diff_x) - mu_bar[2]
 
         if diff_theta > -FOV and diff_theta < FOV:
-            if diff_x*diff_x+diff_y*diff_y < 64:
-                obs_lm_x.append( global_lm[0][i])
-                obs_lm_y.append( global_lm[1][i])
-                obs_lm_radi.append( global_lm[2][i])
+            # if diff_x*diff_x+diff_y*diff_y < 64:
+            obs_lm_x.append( global_lm[0][i])
+            obs_lm_y.append( global_lm[1][i])
+            obs_lm_radi.append( global_lm[2][i])
                 
     return obs_lm_x, obs_lm_y, obs_lm_radi
 
@@ -426,111 +427,47 @@ if __name__ == "__main__":
             obs_lm_x_noise, obs_lm_y_noise = get_noise_landmark_xy(z_true, (real_x, real_y, real_tehta))
             np_obs_x_m_noise=np.append(np_obs_x_m_noise,obs_lm_x_noise)
             np_obs_y_m_noise=np.append(np_obs_y_m_noise,obs_lm_y_noise)
-        
-        np_z_true = np.reshape(np_z_true, (-1,3))
-        np_z_true = np_z_true.T
-        print('np_z_true:', np_z_true)
-        
-        ''' find correspondence'''
-        if len(obs_lm_x) > 0:
-            if len(obs_lm_x) == 0:
-                ''' find correspondence by maximum likelihood '''
-                npLikelihood = np.array([])
-                list_z_hat = []
-                list_S_t = []
-                list_H_t = []
-                print('>>>> find correspondence by maximum likelihood')
-                P = np.vstack((lm_x, lm_y))
-                U = np.vstack((np_obs_x_m_noise, np_obs_y_m_noise))
-                D = dist.cdist(U.T, P.T)
-                print('D: ',D)
-                bool_D = D[0]<2
-                cols = np.where(bool_D==True)
-                cols = cols[0]
-                print('radius under 1m: ',cols)
-                for k in range(len(cols)):
-                    
-                    m_j_x = lm_x[cols[k]]
-                    m_j_y = lm_y[cols[k]]
-                    m_j_radi = lm_radi[cols[k]]
 
-                    '''get predict measurement'''
-                    diff_x = m_j_x - bel_x
-                    diff_y = m_j_y - bel_y
-                    q = (diff_x ** 2) + (diff_y ** 2)
-                    z_hat = np.array([ [np.sqrt(q)],
-                                        [arctan2(diff_y, diff_x) - bel_theta],
-                                        [m_j_radi] ])
-                    H_t = np.array([ [-diff_x / np.sqrt(q), -diff_y / np.sqrt(q), 0],
-                                        [diff_y / q, -diff_x / q, -1],
-                                        [0,0,0] ])
-                    S_t = (H_t @ sigma_bar @ (H_t.T)) + Q_t
-                    
-                    likelihood = np.sqrt(np.linalg.det(2*np.pi*S_t)) * math.exp(-0.5*((z_true-z_hat).T)@(np.linalg.inv(S_t))@(z_true-z_hat))
-                    npLikelihood = np.append(npLikelihood,likelihood)
-                    list_z_hat.append(z_hat)
-                    list_S_t.append(S_t)
-                    list_H_t.append(H_t)
+            np_z_true = np.reshape(np_z_true, (-1,3))
+            np_z_true = np_z_true.T
+            print('np_z_true:', np_z_true)
+            ''' find correspondence by ICP '''
+            print('>>>> find correspondence by ICP')
+            P = np.vstack((lm_x, lm_y))
+            U = np.vstack((obs_lm_x, obs_lm_y)) #############
+            robot_xy = np.array([ [real_x],
+                                [real_y] ])
+            robot_xy_new,R,t,Q, cols = get_Rt_by_ICP( P,U, robot_xy, real_tehta )
 
-                '''maximum likelihood'''
-                maxLikelihood = npLikelihood.argmax()
-                print("matched lm: ", cols[maxLikelihood])
-                H_t = list_H_t.pop(maxLikelihood)
-                S_t = list_S_t.pop(maxLikelihood)
-                z_hat = list_z_hat.pop(maxLikelihood)
+        # for k in range(len(obs_lm_x)):   
+            m_j_x = lm_x[cols[k]]
+            m_j_y = lm_y[cols[k]]
+            m_j_radi = lm_radi[cols[k]]
+                                            
+            '''get predict measurement'''
+            diff_x = m_j_x - bel_x
+            diff_y = m_j_y - bel_y
+            q = (diff_x ** 2) + (diff_y ** 2)
+            z_hat = np.array([ [np.sqrt(q)],
+                                [arctan2(diff_y, diff_x) - bel_theta],
+                                [m_j_radi] ])
+            H_t = np.array([ [-diff_x / np.sqrt(q), -diff_y / np.sqrt(q), 0],
+                                [diff_y / q, -diff_x / q, -1],
+                                [0,0,0] ])
+            S_t = (H_t @ sigma_bar @ (H_t.T)) + Q_t
 
-                '''save estimated measured data'''
-                np_z_hat=np.append(np_z_hat,z_hat)
-                
-                '''kalman gain and update belief'''
-                K_t = sigma_bar @ (H_t.T) @ np.linalg.inv(S_t)
-                mu_bar = mu_bar+K_t@(z_true-z_hat)
-                sigma_bar = (np.identity(sigma_bar.shape[0])-(K_t @ H_t)) @ sigma_bar
-
-            else:
-                ''' find correspondence by ICP '''
-                print('>>>> find correspondence by ICP')
-                P = np.vstack((lm_x, lm_y))
-                
-                U = np.vstack((np_obs_x_m_noise, np_obs_y_m_noise)) #############(obs_lm_x, obs_lm_y)
-                robot_xy = np.array([ [real_x],
-                                      [real_y] ])
-                robot_xy_new,R,t,Q, cols = get_Rt_by_ICP( P,U, robot_xy, real_tehta )
-        
-                    # get_nearby_tree
-                for k in range(len(obs_lm_x)):
-                    m_j_x = lm_x[cols[k]]
-                    m_j_y = lm_y[cols[k]]
-                    m_j_radi = lm_radi[cols[k]]
-                                                    
-                    '''get predict measurement'''
-                    diff_x = m_j_x - bel_x
-                    diff_y = m_j_y - bel_y
-                    q = (diff_x ** 2) + (diff_y ** 2)
-                    z_hat = np.array([ [np.sqrt(q)],
-                                        [arctan2(diff_y, diff_x) - bel_theta],
-                                        [m_j_radi] ])
-                    print('bel_theta: ',bel_theta)           
-                    H_t = np.array([ [-diff_x / np.sqrt(q), -diff_y / np.sqrt(q), 0],
-                                        [diff_y / q, -diff_x / q, -1],
-                                        [0,0,0] ])
-                    S_t = (H_t @ sigma_bar @ (H_t.T)) + Q_t
-
-                    '''save estimated measured data'''
-                    np_z_hat=np.append(np_z_hat,z_hat)
-                    
-                    '''kalman gain and update belief'''
-                    K_t = sigma_bar @ (H_t.T) @ np.linalg.inv(S_t)
-                    z_true = np.reshape(np_z_true[:,k], (-1,3))
-                    z_true = z_true.T
-                    print('z_true-z_hat: ',z_true-z_hat)
-                    print(np_z_true[:,k])
-                    mu_bar = mu_bar+K_t@(z_true-z_hat)
-                    sigma_bar = (np.identity(sigma_bar.shape[0])-(K_t @ H_t)) @ sigma_bar
-            np_z_hat = np.reshape(np_z_hat, (-1,3))
-            np_z_hat = np_z_hat.T
-            print('np_z_hat: ', np_z_hat)
-
+            '''save estimated measured data'''
+            np_z_hat=np.append(np_z_hat,z_hat)
+            
+            '''kalman gain and update belief'''
+            K_t = sigma_bar @ (H_t.T) @ np.linalg.inv(S_t)
+            
+            # z_true = np.reshape(np_z_true[:,k], (-1,3))
+            # z_true = z_true.T
+            # print(z_true-z_hat)
+            mu_bar = mu_bar+K_t@(z_true-z_hat)
+            sigma_bar = (np.identity(sigma_bar.shape[0])-(K_t @ H_t)) @ sigma_bar
+        np_z_hat = np.reshape(np_z_hat, (-1,3))
         '''update belief'''
         mu = mu_bar
         sigma = sigma_bar
@@ -540,11 +477,11 @@ if __name__ == "__main__":
         obs_lm_number[0 , i] = len(np_z_hat)/3
         print("<<finish update: "+str(i))
 
-        # if len(obs_lm_x) != 0:
-        #     # print("difference btw mu_bar and robot_xy_new: ", mu_bar, robot_xy_new)
-        #     tmp = (mu_bar[:2,0] - robot_xy_new[:,0])
-        #     plot_traj((x_pos_true, y_pos_true, theta_pos_true), (mu_x, mu_y, mu_theta), (obs_lm_x, obs_lm_y, obs_lm_radi),(lm_x,lm_y,lm_radi),i, \
-        #                 np_z_hat, np_z_true, (bel_x, bel_y, bel_theta), (real_x, real_y, real_tehta)) 
+        if len(obs_lm_x) > 0:
+            print("difference btw mu_bar and robot_xy_new: ", mu_bar, robot_xy_new)
+            tmp = (mu_bar[:2,0] - robot_xy_new[:,0])
+            plot_traj((x_pos_true, y_pos_true, theta_pos_true), (mu_x, mu_y, mu_theta), (obs_lm_x, obs_lm_y, obs_lm_radi),(lm_x,lm_y,lm_radi),i, \
+                        np_z_hat, np_z_true, (bel_x, bel_y, bel_theta), (real_x, real_y, real_tehta)) 
             
         
         if i%50 == 0:

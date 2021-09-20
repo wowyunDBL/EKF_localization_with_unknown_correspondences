@@ -44,7 +44,7 @@ def plot_traj(true_states, belief_states, markers, markers_in_map, index, update
     number_of_point=12
     piece_rad = np.pi/(number_of_point/2)
     
-    for j in range( len(markers[0]) ):
+    for j in range( len(markers_in_map[0]) ):
         neg_bd = []
         for i in range(number_of_point):
             neg_bd.append((markers_in_map[0][j]+markers_in_map[2][j]*np.cos(piece_rad*i), markers_in_map[1][j]+markers_in_map[2][j]*np.sin(piece_rad*i)))
@@ -148,9 +148,9 @@ if __name__ == "__main__":
     alpha_1, alpha_2, alpha_3, alpha_4 = alpha
 
     '''landmarks'''
-    lm_x = [6,-7,6]
-    lm_y = [4,8,-4]
-    lm_radi = [0.2, 0.5, 0.3]
+    lm_x = [-7,2,3,5,6,6]
+    lm_y = [8,7,6,5,4,-4]
+    lm_radi = [0.2, 0.5, 0.3, 0.2, 0.5, 0.3]
     assert (len(lm_x)==len(lm_y))
     '''std deviation of range and bearing sensor noise for each landmark'''
     std_dev_x = .1
