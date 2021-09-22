@@ -19,7 +19,10 @@ from scipy.io import loadmat
 
 import sys
 
-def plot_traj(true_states, belief_states, markers, markers_in_map, index, np_z_hat, np_z_true, bel_pose, real_pose, cols, icp_flag):
+np.load("/home/ncslaber/110-1/210922_EKF-fusion-test/zigzag_bag/depth/" + str(self.timestampSecs%1000)+'-'+str(int(self.timestampNSecs/1e6)), self.imgDepth)
+# from EKF_localization import localize
+
+def plot_traj(true_states, belief_states, markers, markers_in_map, index, np_z_hat, np_z_true, bel_pose, real_pose, cols, icp_flag, flag):
     x_tr, y_tr, th_tr = true_states
     x_guess, y_guess, theta_guess = belief_states
     # x_tr_lm, y_tr_lm, th_tr_lm = lm_states
@@ -61,10 +64,11 @@ def plot_traj(true_states, belief_states, markers, markers_in_map, index, np_z_h
 
     '''plot observation z'''
     plot_measured_landmarks(np_z_hat, np_z_true, bel_pose, real_pose)
-    if icp_flag == True:
-        plt.text(3.0, 8, 'icp matched points: '+str(cols),fontsize=14)
-    else:
-        plt.text(3.0, 8, 'maximum matched point',fontsize=14)
+    if flag == True:
+        if icp_flag == True:
+            plt.text(3.0, 8, 'icp matched points: '+str(cols),fontsize=14)
+        else:
+            plt.text(3.0, 8, 'maximum matched point',fontsize=14)
 
     '''plot obs lm
     for i in range( len(markers[0]) ):
@@ -76,7 +80,7 @@ def plot_traj(true_states, belief_states, markers, markers_in_map, index, np_z_h
     plt.xticks(fontsize=20)
     plt.legend(fontsize=15)
     # plt.show()
-    fig.savefig('/home/ncslaber/class_material/EKF_localization_with_unknown_correspondences/images/sample_5_times/'+str(index)+'.png')
+    fig.savefig('/home/ncslaber/class_material/EKF_localization_with_unknown_correspondences/images/sample_5_times_with_KF/'+str(index)+'.png')
 
 def plot_measured_landmarks(np_z_hat, np_z_true, bel_pose, real_pose):
     bel_x, bel_y, bel_theta = bel_pose
@@ -355,6 +359,10 @@ if __name__ == "__main__":
     Q_t_tmp = np.array([ [std_dev_dist, 0, 0],
                      [0, std_dev_phi/20, 0],
                      [0, 0, std_dev_radi/20] ] )
+    std_dev_state = .5
+    R_t = np.array([ [std_dev_state, 0, 0],
+                     [0, std_dev_state, 0],
+                     [0, 0, std_dev_state] ] )
 
     '''ground truth'''
     x_pos_true = np.load('/home/ncslaber/class_material/EKF_localization_with_unknown_correspondences/data_ground_truth/x_pos_true.npy')
@@ -453,6 +461,7 @@ if __name__ == "__main__":
         
         ''' find correspondence'''
         if len(obs_lm_x) > 0:
+            flag = True
             if len(obs_lm_x) <= 2:
                 if len(obs_lm_x) == 1:
                     ''' find correspondence by maximum likelihood '''
@@ -499,6 +508,11 @@ if __name__ == "__main__":
                     '''maximum likelihood'''
                     maxLikelihood = npLikelihood.argmax()
                     print("matched lm: ", cols[maxLikelihood])
+                    print('z_true:', z_true)
+                    print('z_hat:', z_hat)
+                    print('z_true-z_hat:', z_true-z_hat)
+                    print('bel: ',(bel_x, bel_y, bel_theta))
+                    print('real: ',(real_x, real_y, real_tehta))
                     H_t = list_H_t.pop(maxLikelihood)
                     S_t = list_S_t.pop(maxLikelihood)
                     z_hat = list_z_hat.pop(maxLikelihood)
@@ -516,6 +530,8 @@ if __name__ == "__main__":
                     U = np.vstack((np_obs_x_m_noise, np_obs_y_m_noise))
                     D = dist.cdist(U.T, P.T)
                     print('D: ',D)
+
+                    '''iterative update predict measurement'''
                     for tmp in [0,1]:
                         ''' find correspondence by maximum likelihood '''
                         npLikelihood = np.array([])
@@ -575,10 +591,8 @@ if __name__ == "__main__":
                         z_true = np.reshape(np_z_true[:,tmp], (-1,3))
                         z_true = z_true.T
                         mu_bar = mu_bar+K_t@(z_true-z_hat)
-                        # print(z_true-z_hat)
-                        # print(z_hat)
-                        if (mu_bar[0,0]-real_x) > 0.3 or (mu_bar[1,0]-real_y) > 0.3:
-                            flag = True
+                        # if (mu_bar[0,0]-real_x) > 0.3 or (mu_bar[1,0]-real_y) > 0.3:
+                            # flag = True
                         sigma_bar = (np.identity(sigma_bar.shape[0])-(K_t @ H_t)) @ sigma_bar
 
             else:
@@ -586,13 +600,12 @@ if __name__ == "__main__":
                 print('>>>> find correspondence by ICP')
                 icp_flag = True
                 P = np.vstack((lm_x, lm_y))
-                
                 U = np.vstack((np_obs_x_m_noise, np_obs_y_m_noise)) #############(obs_lm_x, obs_lm_y)
                 robot_xy = np.array([ [real_x],
                                       [real_y] ])
                 cols = get_Rt_by_ICP( P,U, robot_xy, real_tehta )
         
-                    # get_nearby_tree
+                '''iterative update predict measurement'''
                 for k in range(len(obs_lm_x)):
                     m_j_x = lm_x[cols[k]]
                     m_j_y = lm_y[cols[k]]
@@ -623,13 +636,30 @@ if __name__ == "__main__":
                     # print(np_z_true[:,k])
                     print('mu_bar: ', mu_bar)
                     mu_bar = mu_bar+K_t@(z_true-z_hat)
-                    if (mu_bar[0,0]-real_x) > 0.3 or (mu_bar[1,0]-real_y) > 0.3:
-                        flag = True
+                    # if (mu_bar[0,0]-real_x) > 0.3 or (mu_bar[1,0]-real_y) > 0.3:
+                        # flag = True
                     print('mu_bar_after: ', mu_bar)
                     sigma_bar = (np.identity(sigma_bar.shape[0])-(K_t @ H_t)) @ sigma_bar
             np_z_hat = np.reshape(np_z_hat, (-1,3))
             np_z_hat = np_z_hat.T
             # print('np_z_hat: ', np_z_hat)
+
+        '''update by GPS (here by ground truth)'''
+        
+        z_true = np.array([ [real_x],
+                            [real_y],
+                            [real_tehta] ])
+        print("KF-z_true: ", z_true)
+        C = np.array([  [1,0,0],
+                        [0,1,0],
+                        [0,0,1] ])
+        S_t = (C @ sigma_bar @ (C.T)) + R_t
+        K_t = sigma_bar @ (C.T) @ np.linalg.inv(S_t)
+        z_hat = C @ mu_bar
+        print("KF-z_hat: ", z_hat)
+        mu_bar = mu_bar+K_t@(z_true-z_hat)
+        print("KF-(z_true-z_hat): ", z_true-z_hat)
+        sigma_bar = (np.identity(sigma_bar.shape[0])-(K_t @ C)) @ sigma_bar
 
         '''update belief'''
         mu = mu_bar
@@ -640,16 +670,16 @@ if __name__ == "__main__":
         obs_lm_number[0 , i] = len(np_z_hat)/3
         print("<<<<finish update: "+str(i))
 
-        if  flag==True: #len(obs_lm_x) != 0:
-            # print("difference btw mu_bar and robot_xy_new: ", mu_bar, robot_xy_new)
-            # tmp = (mu_bar[:2,0] - robot_xy_new[:,0])
-            plot_traj((x_pos_true, y_pos_true, theta_pos_true), (mu_x, mu_y, mu_theta), (obs_lm_x, obs_lm_y, obs_lm_radi),(lm_x,lm_y,lm_radi),i, \
-                        np_z_hat, np_z_true, (bel_x, bel_y, bel_theta), (real_x, real_y, real_tehta), cols, icp_flag) 
+        # if  flag==True: #len(obs_lm_x) != 0:
+        #     # print("difference btw mu_bar and robot_xy_new: ", mu_bar, robot_xy_new)
+        #     # tmp = (mu_bar[:2,0] - robot_xy_new[:,0])
+        #     plot_traj((x_pos_true, y_pos_true, theta_pos_true), (mu_x, mu_y, mu_theta), (obs_lm_x, obs_lm_y, obs_lm_radi),(lm_x,lm_y,lm_radi),i, \
+        #                 np_z_hat, np_z_true, (bel_x, bel_y, bel_theta), (real_x, real_y, real_tehta), cols, icp_flag, flag) 
             
         
         if i%10 == 0:
             plot_traj((x_pos_true, y_pos_true, theta_pos_true), (mu_x, mu_y, mu_theta), (obs_lm_x, obs_lm_y, obs_lm_radi),(lm_x,lm_y,lm_radi),i, \
-                        np_z_hat, np_z_true, (bel_x, bel_y, bel_theta), (real_x, real_y, real_tehta), cols, icp_flag) 
+                        np_z_hat, np_z_true, (bel_x, bel_y, bel_theta), (real_x, real_y, real_tehta), cols, icp_flag, flag) 
     
     np.save('/home/ncslaber/class_material/EKF_localization_with_unknown_correspondences/data_ground_truth/mu_x', mu_x)
     np.save('/home/ncslaber/class_material/EKF_localization_with_unknown_correspondences/data_ground_truth/mu_y', mu_y)
