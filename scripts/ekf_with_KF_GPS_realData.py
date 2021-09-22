@@ -19,7 +19,7 @@ from scipy.io import loadmat
 
 import sys
 
-np.load("/home/ncslaber/110-1/210922_EKF-fusion-test/zigzag_bag/depth/" + str(self.timestampSecs%1000)+'-'+str(int(self.timestampNSecs/1e6)), self.imgDepth)
+# np.load("/home/ncslaber/110-1/210922_EKF-fusion-test/zigzag_bag/depth/" + str(self.timestampSecs%1000)+'-'+str(int(self.timestampNSecs/1e6)), self.imgDepth)
 # from EKF_localization import localize
 
 def plot_traj(true_states, belief_states, markers, markers_in_map, index, np_z_hat, np_z_true, bel_pose, real_pose, cols, icp_flag, flag):
@@ -29,9 +29,9 @@ def plot_traj(true_states, belief_states, markers, markers_in_map, index, np_z_h
 
     radius = 0.5
     
-    world_bounds = [-15,10]
-    fig, ax = plt.subplots(figsize=(10,10),dpi=120)
-    ax = plt.axes(xlim=world_bounds, ylim=world_bounds)
+    # world_bounds = [-15,10]
+    fig, ax = plt.subplots(figsize=(10,10))
+    # ax = plt.axes(xlim=world_bounds, ylim=world_bounds)
     ax.set_aspect('equal')
 
     '''plot landmarkers'''
@@ -48,16 +48,17 @@ def plot_traj(true_states, belief_states, markers, markers_in_map, index, np_z_h
         plt.scatter(neg_bd[:,0], neg_bd[:,1], c='k', s=10)
 
     '''plot traj'''
-    plt.scatter(x_tr[0], y_tr[0], color='b', label="Actual", s=10)
+    plt.scatter(x_tr, y_tr, color='b', label="Actual", s=10)
+    print(x_tr)
     
       
     '''plot final state'''
-    plt.scatter(x_tr[0][index],y_tr[0][index], s=300, color='lightblue', ec='k', label='Actual pose')
-    plt.plot( [x_tr[0][index], x_tr[0][index] + radius*cos(th_tr[0][index]) ], 
-               [y_tr[0][index], y_tr[0][index] + radius*sin(th_tr[0][index]) ], color='k' )
-    plt.scatter(x_guess[0][index],y_guess[0][index], s=500, color='y', ec='k', label='Predicted pose')
-    plt.plot( [x_guess[0][index], x_guess[0][index] + radius*cos(theta_guess[0][index]) ], 
-              [y_guess[0][index], y_guess[0][index] + radius*sin(theta_guess[0][index]) ], color='k' )
+        # plt.scatter(x_tr[0][index],y_tr[0][index], s=300, color='lightblue', ec='k', label='Actual pose')
+        # plt.plot( [x_tr[0][index], x_tr[0][index] + radius*cos(th_tr[0][index]) ], 
+        #            [y_tr[0][index], y_tr[0][index] + radius*sin(th_tr[0][index]) ], color='k' )
+        # plt.scatter(x_guess[0][index],y_guess[0][index], s=500, color='y', ec='k', label='Predicted pose')
+        # plt.plot( [x_guess[0][index], x_guess[0][index] + radius*cos(theta_guess[0][index]) ], 
+        #           [y_guess[0][index], y_guess[0][index] + radius*sin(theta_guess[0][index]) ], color='k' )
     # plt.scatter(x_tr_lm[0][index],y_tr_lm[0][index], s=400, color='lightblue', ec='k', label='landmark pose')
     # plt.plot( [x_tr_lm[0][index], x_tr_lm[0][index] + radius*cos(th_tr_lm[0][index]) ], 
     #           [y_tr_lm[0][index], y_tr_lm[0][index] + radius*sin(th_tr_lm[0][index]) ], color='k' )
@@ -79,8 +80,8 @@ def plot_traj(true_states, belief_states, markers, markers_in_map, index, np_z_h
     plt.yticks(fontsize=20)
     plt.xticks(fontsize=20)
     plt.legend(fontsize=15)
-    # plt.show()
-    fig.savefig('/home/ncslaber/class_material/EKF_localization_with_unknown_correspondences/images/sample_5_times_with_KF/'+str(index)+'.png')
+    plt.show()
+    # fig.savefig('/home/ncslaber/110-1/210922_EKF-fusion-test/zigzag_bag/TMP'+str(index)+'.png')
 
 def plot_measured_landmarks(np_z_hat, np_z_true, bel_pose, real_pose):
     bel_x, bel_y, bel_theta = bel_pose
@@ -149,23 +150,30 @@ def get_mu_bar(prev_mu, velocity, omega, angle, dt):
                   [omega*dt]])
     return prev_mu + m
 
-def get_observed_lm(mu_bar, global_lm):
-    obs_lm_x = []
-    obs_lm_y = []
-    obs_lm_radi = []
-    FOV = np.pi/2
-    for i in range( len(global_lm[0]) ):
-        diff_x = global_lm[0][i] - mu_bar[0]
-        diff_y = global_lm[1][i] - mu_bar[1]
-        diff_theta = arctan2(diff_y, diff_x) - mu_bar[2]
+def get_observed_lm(index):
+    file_path = "/home/ncslaber/110-1/210922_EKF-fusion-test/zigzag_bag/"
+    # obs_lm_x = []
+    # obs_lm_y = []
+    # obs_lm_radi = []
+    np_z_true = []
+    cX_utm_loc = np.load(file_path+"found_center/"+str(index)+'-x.npy')
+    cY_utm_loc = np.load(file_path+"found_center/"+str(index)+'-y.npy')
+    obs_lm_x = np.load(file_path+"found_center/"+str(index)+'-q_x.npy')
+    obs_lm_y = np.load(file_path+"found_center/"+str(index)+'-q_y.npy')
+    obs_lm_radi = np.load(file_path+"found_center/"+str(index)+'-r.npy')
+    for c in range( len(obs_lm_x) ):
+        diff_x = obs_lm_x[c] 
+        diff_y = obs_lm_y[c] 
+        diff_theta = arctan2(diff_y, diff_x)
 
-        if diff_theta > -FOV and diff_theta < FOV:
-            if diff_x*diff_x+diff_y*diff_y < 64:
-                obs_lm_x.append( global_lm[0][i])
-                obs_lm_y.append( global_lm[1][i])
-                obs_lm_radi.append( global_lm[2][i])
+        q = (diff_x ** 2) + (diff_y ** 2)
+        z_true = np.array([ [np.sqrt(q)],
+                            [diff_theta],
+                            [obs_lm_radi[c]] ])
+
+        np_z_true=np.append(np_z_true, z_true)
                 
-    return obs_lm_x, obs_lm_y, obs_lm_radi
+    return np_z_true, cX_utm_loc, cY_utm_loc, obs_lm_radi
 
 def get_G_t(v, w, angle, dt):
     return np.array([
@@ -293,20 +301,28 @@ def get_Rt_by_ICP(P,U, robot_xy, theta):
     return cols 
 
 def get_landmark():
-    ''' load landmark map 
-    directory = '/home/ncslaber/109-2/210725_NTU_leftAreaLibrary/'
-    bag_name = 'ntu_test3_2021-07-25-18-23-39/'
-    file_path_map = directory+bag_name
-    center_utm_ref = np.load(file_path_map+'center_utm_ref.npy')'''
-    lm_x = [-7,2,3,5,6,6,3] 
-    lm_y = [8,7,6,5,4,-4,-6] 
-    lm_radi = [0.2, 0.5, 0.3, 0.2, 0.5, 0.3, 0.4]
-    # lm_x = [-7,6,6] 
-    # lm_y = [8,4,-4] 
-    # lm_radi = [0.2, 0.5, 0.3]
-    # lm_x = [8,6,6] 
-    # lm_y = [2,4,-4] 
-    # lm_radi = [0.2, 0.5, 0.3]
+
+    lm_x = []
+    lm_y = []
+    lm_radi = []
+    ''' load landmark map '''
+    directory = '/home/ncslaber/mapping_node/mapping_ws/src/mapping_explorer/NTU_allMaps/'
+    files_to_check = ['210906_loopClosure']
+    file_path_map = directory+files_to_check[0]
+    shp_path = file_path_map + '/shapefiles/'
+    for i in range(0,2):
+        center = np.load(shp_path+'center_'+str(i+1)+'_bd_utm.npy')
+        if center is None:
+            print("neg_bd is empty!!")
+        else: 
+            lm_x.append(center[0])
+            lm_y.append(center[1])
+            lm_radi.append(center[2])
+    # center_utm_ref = np.load(file_path_map+'center_utm_ref.npy')
+    # lm_x = [-7,2,3,5,6,6,3] 
+    # lm_y = [8,7,6,5,4,-4,-6] 
+    # lm_radi = [0.2, 0.5, 0.3, 0.2, 0.5, 0.3, 0.4]
+    
     
     return lm_x, lm_y, lm_radi
 
@@ -321,22 +337,30 @@ def get_noise_landmark_xy(z_true, robot_pose):
     return wr_x, wr_y
 
 if __name__ == "__main__":
-    dt = .1
-    t = np.arange(0, 20+dt, dt)
+    # dt = .1
+    # t = np.arange(0, 20+dt, dt)
+    # t = np.reshape(t, (1,-1))
+    file_path = '/home/ncslaber/110-1/210922_EKF-fusion-test/zigzag_bag/'
+    with open(file_path + 'cb_pose.csv', 'r') as csvfile:
+        robot_pose_gps = list( csv.reader(csvfile, delimiter=',') )
+        robot_pose_gps = np.array(robot_pose_gps).astype(float)
+        
+    t = robot_pose_gps.shape[0]
+    t = np.arange(0, t, 1)
     t = np.reshape(t, (1,-1))
-    
+
     ''' belief (estimate from EKF) '''
     mu_x = np.zeros(t.shape)
     mu_y = np.zeros(t.shape)
     mu_theta = np.zeros(t.shape)   # radians
     ''' starting belief - initial condition (robot pose) '''
-    mu_x[0,0] = -5
-    mu_y[0,0] = -3
-    mu_theta[0,0] = 90/180*np.pi
+    mu_x[0,0] = robot_pose_gps[0][0]
+    mu_y[0,0] = robot_pose_gps[0][1]
+    mu_theta[0,0] = robot_pose_gps[0][2]
     '''initial uncertainty in the belief'''
-    sigma = np.array([[1, 0, 0],  # x
-                      [0, 1, 0],  # y
-                      [0, 0, .1] ]) # theta
+    sigma = np.array( [[1, 0, 0],  # x
+                       [0, 1, 0],  # y
+                       [0, 0, .1] ]) # theta
     
     '''command velocity'''
     v_c = 1 + 0.5*cos(2*np.pi*(0.2)*t)
@@ -364,10 +388,10 @@ if __name__ == "__main__":
                      [0, std_dev_state, 0],
                      [0, 0, std_dev_state] ] )
 
-    '''ground truth'''
+    '''ground truth
     x_pos_true = np.load('/home/ncslaber/class_material/EKF_localization_with_unknown_correspondences/data_ground_truth/x_pos_true.npy')
     y_pos_true = np.load('/home/ncslaber/class_material/EKF_localization_with_unknown_correspondences/data_ground_truth/y_pos_true.npy')
-    theta_pos_true = np.load('/home/ncslaber/class_material/EKF_localization_with_unknown_correspondences/data_ground_truth/theta_pos_true.npy')
+    theta_pos_true = np.load('/home/ncslaber/class_material/EKF_localization_with_unknown_correspondences/data_ground_truth/theta_pos_true.npy')'''
     # x_pos_true = np.zeros(t.shape)
     # y_pos_true = np.zeros(t.shape)
     # theta_pos_true = np.zeros(t.shape)
@@ -396,74 +420,77 @@ if __name__ == "__main__":
     obs_lm_number = np.zeros(t.shape)
     cols=[]
 
+    
     '''run EKF'''
     mu = np.array([ [mu_x[0,0]],[mu_y[0,0]],[mu_theta[0,0]] ])
-    for i in range(1, t.size):
+    mu_bar = mu
+    sigma_bar = sigma
+    for i in range(1, 10):
         print(">>>>new ietration: "+str(i))
         flag = False
         icp_flag = False
         
         # This is only for temperary covariance
-        curr_v = v_c[0,i]
-        curr_w = omg_c[0,i]
-        prev_theta = mu_theta[0,i-1]
+            # curr_v = v_c[0,i]
+            # curr_w = omg_c[0,i]
+            # prev_theta = mu_theta[0,i-1]
 
-        G_t = get_G_t(curr_v, curr_w, prev_theta, dt)
-        V_t = get_V_t(curr_v, curr_w, prev_theta, dt)
-        M_t = get_M_t(alpha, curr_v, curr_w)
+            # G_t = get_G_t(curr_v, curr_w, prev_theta, dt)
+            # V_t = get_V_t(curr_v, curr_w, prev_theta, dt)
+            # M_t = get_M_t(alpha, curr_v, curr_w)
 
         '''prediction step'''
-        mu_bar = get_mu_bar(mu, curr_v, curr_w, prev_theta, dt)
-        # mu = np.array([ [x_pos_true[0,i]],[y_pos_true[0,i]],[theta_pos_true[0,i]] ])
-        sigma_bar = (G_t @ sigma @ (G_t.T)) + (V_t @ M_t @ (V_t.T))
+        # mu_bar = get_mu_bar(mu, curr_v, curr_w, prev_theta, dt)
+        
+        # sigma_bar = (G_t @ sigma @ (G_t.T)) + (V_t @ M_t @ (V_t.T))
 
         '''correction (updating belief based on landmark readings)'''
         bel_x = mu_bar[0,0]
         bel_y = mu_bar[1,0]
         bel_theta = mu_bar[2,0]
 
-        '''measured landmarks'''
-        real_x = x_pos_true[0,i]
-        real_y = y_pos_true[0,i]
-        real_tehta = theta_pos_true[0,i]
-        obs_lm_x, obs_lm_y, obs_lm_radi= get_observed_lm( [real_x,real_y,real_tehta], (lm_x, lm_y, lm_radi) )
-        
-        '''generate noise measurement'''
+        '''measured landmarks
+        # real_x = x_pos_true[0,i]
+        # real_y = y_pos_true[0,i]
+        # real_tehta = theta_pos_true[0,i]
+        obs_lm_x, obs_lm_y, obs_lm_radi= get_observed_lm( [real_x,real_y,real_tehta], (lm_x, lm_y, lm_radi) )'''
+        np_z_hat=np.array([[],[],[]])
+        '''generate noise measurement
         np_z_true=np.array([[],[],[]])
         np_z_hat=np.array([[],[],[]])
         np_obs_x_m_noise=np.array([])
-        np_obs_y_m_noise=np.array([])
-        for k in range(len(obs_lm_x)):
+        np_obs_y_m_noise=np.array([])'''
+
+        # for k in range(len(obs_lm_x)):
                        
-            obs_k_x = obs_lm_x[k]
-            obs_k_y = obs_lm_y[k]
-            obs_k_radi = obs_lm_radi[k]
+        #     obs_k_x = obs_lm_x[k]
+        #     obs_k_y = obs_lm_y[k]
+        #     obs_k_radi = obs_lm_radi[k]
             
-            '''get the sensor measurement'''
+        '''get the sensor measurement
             diff_x = obs_k_x - real_x
             diff_y = obs_k_y - real_y
             q = (diff_x ** 2) + (diff_y ** 2)
             z_true = np.array([ [np.sqrt(q)],
                                 [arctan2(diff_y, diff_x) - real_tehta],
-                                [obs_k_radi] ])
-            print('z_true:', z_true)
-            z_true += make_noise(Q_t_tmp)
-            print('z_true_noise:', z_true)
+                                [obs_k_radi] ])'''
+            
 
-            '''save real measured data'''
+        '''save real measured data
             np_z_true=np.append(np_z_true, z_true)
             obs_lm_x_noise, obs_lm_y_noise = get_noise_landmark_xy(z_true, (real_x, real_y, real_tehta))
             np_obs_x_m_noise=np.append(np_obs_x_m_noise,obs_lm_x_noise)
-            np_obs_y_m_noise=np.append(np_obs_y_m_noise,obs_lm_y_noise)
+            np_obs_y_m_noise=np.append(np_obs_y_m_noise,obs_lm_y_noise)'''
         
+        np_z_true, np_obs_x_m_noise, np_obs_y_m_noise, obs_lm_radi = get_observed_lm(i)
         np_z_true = np.reshape(np_z_true, (-1,3))
         np_z_true = np_z_true.T
         
         ''' find correspondence'''
-        if len(obs_lm_x) > 0:
+        if len(np_obs_x_m_noise) > 0:
             flag = True
-            if len(obs_lm_x) <= 2:
-                if len(obs_lm_x) == 1:
+            if len(np_obs_x_m_noise) <= 2:
+                if len(np_obs_x_m_noise) == 1:
                     ''' find correspondence by maximum likelihood '''
                     npLikelihood = np.array([])
                     list_z_hat = []
@@ -524,8 +551,8 @@ if __name__ == "__main__":
                     K_t = sigma_bar @ (H_t.T) @ np.linalg.inv(S_t)
                     mu_bar = mu_bar+K_t@(z_true-z_hat)
                     sigma_bar = (np.identity(sigma_bar.shape[0])-(K_t @ H_t)) @ sigma_bar
-                elif len(obs_lm_x) == 2:
-                    print('>>>> find correspondence by maximum likelihood')
+                elif len(np_obs_x_m_noise) == 2:
+                    print('>>>> find correspondence by maximum likelihood 2')
                     P = np.vstack((lm_x, lm_y))
                     U = np.vstack((np_obs_x_m_noise, np_obs_y_m_noise))
                     D = dist.cdist(U.T, P.T)
@@ -646,9 +673,9 @@ if __name__ == "__main__":
 
         '''update by GPS (here by ground truth)'''
         
-        z_true = np.array([ [real_x],
-                            [real_y],
-                            [real_tehta] ])
+        z_true = np.array([ [robot_pose_gps[i][0]],
+                            [robot_pose_gps[i][1]],
+                            [robot_pose_gps[i][2]] ])
         print("KF-z_true: ", z_true)
         C = np.array([  [1,0,0],
                         [0,1,0],
@@ -677,13 +704,13 @@ if __name__ == "__main__":
         #                 np_z_hat, np_z_true, (bel_x, bel_y, bel_theta), (real_x, real_y, real_tehta), cols, icp_flag, flag) 
             
         
-        if i%10 == 0:
-            plot_traj((x_pos_true, y_pos_true, theta_pos_true), (mu_x, mu_y, mu_theta), (obs_lm_x, obs_lm_y, obs_lm_radi),(lm_x,lm_y,lm_radi),i, \
-                        np_z_hat, np_z_true, (bel_x, bel_y, bel_theta), (real_x, real_y, real_tehta), cols, icp_flag, flag) 
+        # if i%10 == 0:
+        plot_traj(z_true, (mu_x, mu_y, mu_theta), (np_obs_x_m_noise, np_obs_y_m_noise, obs_lm_radi),(lm_x,lm_y,lm_radi),i, \
+                    np_z_hat, np_z_true, (bel_x, bel_y, bel_theta), z_true, cols, icp_flag, flag) 
     
-    np.save('/home/ncslaber/class_material/EKF_localization_with_unknown_correspondences/data_ground_truth/mu_x', mu_x)
-    np.save('/home/ncslaber/class_material/EKF_localization_with_unknown_correspondences/data_ground_truth/mu_y', mu_y)
-    np.save('/home/ncslaber/class_material/EKF_localization_with_unknown_correspondences/data_ground_truth/mu_theta', mu_theta)
-    np.save('/home/ncslaber/class_material/EKF_localization_with_unknown_correspondences/data_ground_truth/obs_lm_number', obs_lm_number)
-    np.save('/home/ncslaber/class_material/EKF_localization_with_unknown_correspondences/data_ground_truth/obs_lm_vector', np_z_true)
+    # np.save('/home/ncslaber/class_material/EKF_localization_with_unknown_correspondences/data_ground_truth/mu_x', mu_x)
+    # np.save('/home/ncslaber/class_material/EKF_localization_with_unknown_correspondences/data_ground_truth/mu_y', mu_y)
+    # np.save('/home/ncslaber/class_material/EKF_localization_with_unknown_correspondences/data_ground_truth/mu_theta', mu_theta)
+    # np.save('/home/ncslaber/class_material/EKF_localization_with_unknown_correspondences/data_ground_truth/obs_lm_number', obs_lm_number)
+    # np.save('/home/ncslaber/class_material/EKF_localization_with_unknown_correspondences/data_ground_truth/obs_lm_vector', np_z_true)
     
