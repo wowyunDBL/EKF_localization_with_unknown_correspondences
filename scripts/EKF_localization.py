@@ -27,31 +27,6 @@ def get_mu_bar(prev_mu, velocity, omega, angle, dt):
                   [omega*dt]])
     return prev_mu + m
 
-def get_observed_lm(index):
-    file_path = "/home/ncslaber/110-1/210922_EKF-fusion-test/zigzag_bag/"
-    # obs_lm_x = []
-    # obs_lm_y = []
-    # obs_lm_radi = []
-    np_z_true = []
-    cX_utm_loc = np.load(file_path+"found_center/"+str(index)+'-x.npy')
-    cY_utm_loc = np.load(file_path+"found_center/"+str(index)+'-y.npy')
-    obs_lm_x = np.load(file_path+"found_center/"+str(index)+'-q_x.npy')
-    obs_lm_y = np.load(file_path+"found_center/"+str(index)+'-q_y.npy')
-    obs_lm_radi = np.load(file_path+"found_center/"+str(index)+'-r.npy')
-    obs_lm_radi = obs_lm_radi/ 10
-    for c in range( len(obs_lm_x) ):
-        diff_x = obs_lm_x[c] 
-        diff_y = obs_lm_y[c] 
-        diff_theta = arctan2(diff_y, diff_x)
-
-        q = (diff_x ** 2) + (diff_y ** 2)
-        z_true = np.array([ [np.sqrt(q)],
-                            [diff_theta],
-                            [obs_lm_radi[c]] ])
-
-        np_z_true=np.append(np_z_true, z_true)
-                
-    return np_z_true, cX_utm_loc, cY_utm_loc, obs_lm_radi
 
 def get_G_t(v, w, angle, dt):
     return np.array([
@@ -83,4 +58,41 @@ def make_noise(cov_matrix):
         np.random.multivariate_normal(np.zeros(cov_matrix.shape[0]), cov_matrix)
     return np.reshape(noisy_transition, (-1,1))
 
+def get_predict_lm_measure_and_likelihood(diff_x, diff_y, bel_theta, z_true,  m_j_radi, sigma_bar, Q_t, weight_feature=1):
+    
+    q = (diff_x ** 2) + (diff_y ** 2)
+    z_hat = np.array([ [np.sqrt(q)],
+                        [arctan2(diff_y, diff_x) - bel_theta],
+                        [m_j_radi] ])
+    if z_hat[1,0] > np.pi:
+        z_hat[1,0] = z_hat[1,0] - 2*np.pi
+    H_t = np.array([ [-diff_x / np.sqrt(q), -diff_y / np.sqrt(q), 0],
+                        [diff_y / q, -diff_x / q, -1],
+                        [0,0,0] ])
+    S_t = (H_t @ sigma_bar @ (H_t.T)) + Q_t
+    
+
+    diff_z = z_true-z_hat
+    diff_z[2,0] *= weight_feature
+    likelihood = np.sqrt(np.linalg.det(2*np.pi*S_t)) * math.exp(-0.5*(diff_z).T)@(np.linalg.inv(S_t))@diff_z))
+
+    return z_hat, H_t, S_t, likelihood 
+
+def get_predict_lm_measure(diff_x, diff_y, bel_theta, m_j_radi, sigma_bar, Q_t):
+    
+    q = (diff_x ** 2) + (diff_y ** 2)
+    z_hat = np.array([ [np.sqrt(q)],
+                        [arctan2(diff_y, diff_x) - bel_theta],
+                        [m_j_radi] ])
+    if z_hat[1,0] > np.pi:
+        z_hat[1,0] = z_hat[1,0] - 2*np.pi
+    H_t = np.array([ [-diff_x / np.sqrt(q), -diff_y / np.sqrt(q), 0],
+                        [diff_y / q, -diff_x / q, -1],
+                        [0,0,0] ])
+    S_t = (H_t @ sigma_bar @ (H_t.T)) + Q_t
+    
+
+    return z_hat, H_t, S_t
+
 if __name__ == '__main__':
+    pass

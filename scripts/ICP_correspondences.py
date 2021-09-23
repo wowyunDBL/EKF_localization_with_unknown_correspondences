@@ -14,6 +14,15 @@ def find_second_min(row_index, D, cols):
     
     return second_min, sm_index
 
+def get_correspondences_in_range(D, dist=2):
+    
+    bool_D = D<dist  # distance less than 2m
+    print('bool_D: ',bool_D)
+    cols = np.where(bool_D==True)
+    cols = cols[0]
+
+    return cols
+
 def get_correspondences(P,U):
     
     D = dist.cdist(U.T, P.T)
@@ -42,7 +51,7 @@ def get_correspondences(P,U):
 
     return Q, cols
 
-def get_Rt_by_ICP(P,U, robot_xy, theta):
+def get_Rt_by_ICP(P,U): #, robot_xy, theta
     resid_scalar = 50
     count = 0
     '''plot transformed result'''
@@ -77,8 +86,8 @@ def get_Rt_by_ICP(P,U, robot_xy, theta):
         print('Q_bar: ', Q_bar)
         print('U_bar: ', U_bar)
         U_new = R@X + U_bar+t
-        robot_xy_decentral = robot_xy-U_bar
-        robot_xy_new = R @ robot_xy_decentral + (U_bar+t)
+        # robot_xy_decentral = robot_xy-U_bar
+        # robot_xy_new = R @ robot_xy_decentral + (U_bar+t)
 
         # calculate residuals
         residuals = Q-U_new
@@ -86,7 +95,7 @@ def get_Rt_by_ICP(P,U, robot_xy, theta):
         resid_scalar = residuals.sum()
         print("residual = ",resid_scalar)
         U = U_new
-        robot_xy = np.array([[robot_xy_new[0][0]],[robot_xy_new[1][0]]])
+        # robot_xy = np.array([[robot_xy_new[0][0]],[robot_xy_new[1][0]]])
         
         '''plot transformed result'''
         # plot_transformed(P,U, robot_xy, theta, count)
