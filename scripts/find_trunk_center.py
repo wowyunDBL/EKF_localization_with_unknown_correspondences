@@ -18,7 +18,7 @@ if sys.platform.startswith('linux'): # or win
     file_path = "/home/ncslaber/110-1/210922_EKF-fusion-test/zigzag_bag/"
 
 
-for AA in range(10):
+for AA in range(100):
     ''' show raw data '''
     npDepth = np.load(file_path+"depth/"+str(AA)+".npy")
     npColor = np.load(file_path+"color/"+str(AA)+".npy")
@@ -135,8 +135,8 @@ for AA in range(10):
     np.save(file_path+"found_center/"+str(AA)+'-x',cX_utm_loc )
     np.save(file_path+"found_center/"+str(AA)+'-y',cY_utm_loc )
 
-    np.save(file_path+"found_center/"+str(AA)+'-q_x',centre_x_list )
-    np.save(file_path+"found_center/"+str(AA)+'-q_y',centre_y_list )
+    np.save(file_path+"found_center/"+str(AA)+'-q_x',cX_m_loc )
+    np.save(file_path+"found_center/"+str(AA)+'-q_y',cY_m_loc )
     np.save(file_path+"found_center/"+str(AA)+'-r',radius_r_list )
 
 
