@@ -172,12 +172,18 @@ if __name__ == "__main__":
     Q_t_tmp = np.array([ [std_dev_dist, 0, 0],
                      [0, std_dev_phi/20, 0],
                      [0, 0, std_dev_radi/20] ] )
+    R_t = np.array([ [std_dev_state, 0, 0],
+                     [0, std_dev_state, 0],
+                     [0, 0, std_dev_state] ] )
 
     '''ground truth'''
     x_pos_true = np.load('/home/ncslaber/class_material/EKF_localization_with_unknown_correspondences/data_ground_truth/x_pos_true.npy')
     y_pos_true = np.load('/home/ncslaber/class_material/EKF_localization_with_unknown_correspondences/data_ground_truth/y_pos_true.npy')
     theta_pos_true = np.load('/home/ncslaber/class_material/EKF_localization_with_unknown_correspondences/data_ground_truth/theta_pos_true.npy')
     
+    '''generate odom'''
+    # x_pos_true
+
     '''set ground truth data by calculation'''
     # load_data_utils.generate_ground_truth(t)
     
@@ -192,17 +198,12 @@ if __name__ == "__main__":
         flag = False
         icp_flag = False
         
-        # This is only for temperary covariance
-        curr_v = v_c[0,i]
-        curr_w = omg_c[0,i]
-        prev_theta = mu_theta[0,i-1]
-
         '''prediction step'''
-        G_t = EKF_localization.get_G_t(curr_v, curr_w, prev_theta, dt)
-        V_t = EKF_localization.get_V_t(curr_v, curr_w, prev_theta, dt)
-        M_t = EKF_localization.get_M_t(alpha, curr_v, curr_w)
+        prev_odom_hat = np.array([ [x_pos_true[0, i-1]], [y_pos_true[0, i-1]], [theta_pos_true[0, i-1]] ])
+        odom_hat = np.array([ [x_pos_true[0, i]], [y_pos_true[0, i]], [theta_pos_true[0, i]] ])
+        # odom_hat += make_noise(R_t)
 
-        mu_bar = EKF_localization.get_mu_bar(mu, curr_v, curr_w, prev_theta, dt)
+        mu_bar = EKF_localization.get_mu_bar_odom_modle(mu, (prev_odom_hat, odom_hat))
         # mu = np.array([ [x_pos_true[0,i]],[y_pos_true[0,i]],[theta_pos_true[0,i]] ])
         sigma_bar = (G_t @ sigma @ (G_t.T)) + (V_t @ M_t @ (V_t.T))
 
@@ -412,20 +413,14 @@ if __name__ == "__main__":
         obs_lm_number[0 , i] = len(np_z_hat)/3
         print("<<<<finish update: "+str(i))
 
-        # if  flag==True: #len(obs_lm_x) != 0:
+        if  flag==True: #len(obs_lm_x) != 0:
             # print("difference btw mu_bar and robot_xy_new: ", mu_bar, robot_xy_new)
             # tmp = (mu_bar[:2,0] - robot_xy_new[:,0])
-            # plot_utils.plot_traj((x_pos_true, y_pos_true, theta_pos_true), (mu_x, mu_y, mu_theta), (obs_lm_x, obs_lm_y, obs_lm_radi),(lm_x,lm_y,lm_radi),i, \
-                        # np_z_hat, np_z_true, (bel_x, bel_y, bel_theta), (real_x, real_y, real_tehta), cols, icp_flag) 
+            plot_traj((x_pos_true, y_pos_true, theta_pos_true), (mu_x, mu_y, mu_theta), (obs_lm_x, obs_lm_y, obs_lm_radi),(lm_x,lm_y,lm_radi),i, \
+                        np_z_hat, np_z_true, (bel_x, bel_y, bel_theta), (real_x, real_y, real_tehta), cols, icp_flag) 
             
         
         if i%10 == 0:
-            plot_utils.plot_traj((x_pos_true, y_pos_true, theta_pos_true), (mu_x, mu_y, mu_theta), (obs_lm_x, obs_lm_y, obs_lm_radi),(lm_x,lm_y,lm_radi),i, \
+            plot_traj((x_pos_true, y_pos_true, theta_pos_true), (mu_x, mu_y, mu_theta), (obs_lm_x, obs_lm_y, obs_lm_radi),(lm_x,lm_y,lm_radi),i, \
                         np_z_hat, np_z_true, (bel_x, bel_y, bel_theta), (real_x, real_y, real_tehta), cols, icp_flag) 
-    
-    # np.save('/home/ncslaber/class_material/EKF_localization_with_unknown_correspondences/data_ground_truth/mu_x', mu_x)
-    # np.save('/home/ncslaber/class_material/EKF_localization_with_unknown_correspondences/data_ground_truth/mu_y', mu_y)
-    # np.save('/home/ncslaber/class_material/EKF_localization_with_unknown_correspondences/data_ground_truth/mu_theta', mu_theta)
-    # np.save('/home/ncslaber/class_material/EKF_localization_with_unknown_correspondences/data_ground_truth/obs_lm_number', obs_lm_number)
-    # np.save('/home/ncslaber/class_material/EKF_localization_with_unknown_correspondences/data_ground_truth/obs_lm_vector', np_z_true)
     

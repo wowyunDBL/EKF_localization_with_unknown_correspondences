@@ -43,7 +43,6 @@ if __name__ == "__main__":
     # t = np.arange(0, 20+dt, dt)
     # t = np.reshape(t, (1,-1))
     
-    
     file_path = '/home/ncslaber/110-1/210922_EKF-fusion-test/zigzag_bag/'
     filtered_map_x, filtered_map_y, filtered_map_t = get_filtered_map_pose(file_path)
         
