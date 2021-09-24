@@ -25,103 +25,7 @@ import load_data_utils
 import plot_utils
 import EKF_localization
 import ICP_correspondences
-    
-
-
-def find_second_min(row_index, D, cols):
-    second_min = 100
-    sm_index = 0
-    row_list = D[row_index,:]
-    for i in range(len(row_list)):
-        if i != cols[row_index]:
-            if row_list[i] < second_min:
-                second_min = row_list[i]
-                sm_index = i
-    
-    return second_min, sm_index
-
-def get_correspondences(P,U):
-    
-    D = dist.cdist(U.T, P.T)
-    print('dist: ', D)
-    # rows = D.min(axis=1)
-    cols = D.argmin(axis=1)
-    print('match point: ', list(enumerate(cols)))
-
-    for a in range(len(cols)):
-        b=1
-        while a+b < len(cols):
-            if cols[a] == cols[a+b]:
-                print("matched same ref landmarks!")
-                second_min_A,A = find_second_min(a, D, cols)
-                second_min_B,B = find_second_min(a+b, D, cols)
-                if second_min_A>=second_min_B:
-                    cols[a+b]=B
-                elif second_min_A<second_min_B:
-                    cols[a]=A
-                print('changed matched point-set: ', list(enumerate(cols)))
-            b+=1
-        
-    Q = np.zeros(U.shape)
-    for (row, col) in enumerate(cols):
-        Q[:,row] = P[:,col]
-
-    return Q, cols
-
-def get_Rt_by_ICP(P,U, robot_xy, theta):
-    resid_scalar = 50
-    count = 0
-    '''plot transformed result'''
-    # plot_transformed(P,U, robot_xy,theta, count)
-    print('>>>> start to ICP >>>>')
-    while resid_scalar > 1:
-        print(">>iteration time: ", count)
-        print('P: ',P)
-        print('U: ',U)
-        count += 1
-        Q, cols = get_correspondences(P,U)
-        U_bar = np.array([np.average(U, axis=1)])
-        U_bar = U_bar.T
-        Q_bar = np.array([np.average(Q, axis=1)])
-        Q_bar = Q_bar.T
-
-        X = U-U_bar
-        Y = Q-Q_bar
-        S = X @ Y.T
-        u, s, vh = np.linalg.svd(S)
-
-        det = np.linalg.det(vh@u.T)
-        print('det(vh@u.T): ', det)
-        if det>0:
-            tmp = np.array([ [1,0],[0,1] ])
-        else: 
-            tmp = np.array([ [1,0],[0,-1] ])
-        R = vh @ tmp @ u.T
-        t = Q_bar-U_bar
-        print('R: ', R)
-        print('t: ', t)
-        print('Q_bar: ', Q_bar)
-        print('U_bar: ', U_bar)
-        U_new = R@X + U_bar+t
-        robot_xy_decentral = robot_xy-U_bar
-        robot_xy_new = R @ robot_xy_decentral + (U_bar+t)
-
-        # calculate residuals
-        residuals = Q-U_new
-        residuals = np.absolute(residuals)
-        resid_scalar = residuals.sum()
-        print("residual = ",resid_scalar)
-        U = U_new
-        robot_xy = np.array([[robot_xy_new[0][0]],[robot_xy_new[1][0]]])
-        
-        '''plot transformed result'''
-        # plot_transformed(P,U, robot_xy, theta, count)
-
-        if count>4:
-            print("iterate over 5 times!!")
-            break
-
-    return cols 
+     
 
 def get_noise_landmark_xy(z_true, robot_pose):
     (real_x, real_y, real_tehta) = robot_pose
@@ -159,7 +63,7 @@ if __name__ == "__main__":
     alpha_1, alpha_2, alpha_3, alpha_4 = alpha
 
     '''landmarks'''
-    lm_x, lm_y, lm_radi = get_landmark()
+    lm_x, lm_y, lm_radi = load_data_utils.get_landmark()
     assert (len(lm_x)==len(lm_y))
     '''std deviation of range and bearing sensor noise for each landmark'''
     std_dev_dist = .05
@@ -236,7 +140,7 @@ if __name__ == "__main__":
                                 [arctan2(diff_y, diff_x) - real_tehta],
                                 [obs_k_radi] ])
             print('z_true:', z_true)
-            z_true += make_noise(Q_t_tmp)
+            z_true += EKF_localization.make_noise(Q_t_tmp) 
             print('z_true_noise:', z_true)
 
             '''save real measured data'''
@@ -371,9 +275,8 @@ if __name__ == "__main__":
                 P = np.vstack((lm_x, lm_y))
                 
                 U = np.vstack((np_obs_x_m_noise, np_obs_y_m_noise)) #############(obs_lm_x, obs_lm_y)
-                robot_xy = np.array([ [real_x],
-                                      [real_y] ])
-                cols = get_Rt_by_ICP( P,U, robot_xy, real_tehta )
+                
+                cols = ICP_correspondences.get_Rt_by_ICP( P,U)
         
                 '''iterative update predict measurement'''
                 for k in range(len(obs_lm_x)):
@@ -385,8 +288,8 @@ if __name__ == "__main__":
                     diff_x = m_j_x - bel_x
                     diff_y = m_j_y - bel_y
                     
-                    z_hat, H_t, S_t = \
-                        get_predict_lm_measure(diff_x, diff_y, bel_theta, m_j_radi, sigma_bar, Q_t)
+                    z_hat, H_t, S_t \
+                         = EKF_localization.get_predict_lm_measure(diff_x, diff_y, bel_theta, m_j_radi, sigma_bar, Q_t)
                                         
                     '''kalman gain and update belief'''
                     K_t = sigma_bar @ (H_t.T) @ np.linalg.inv(S_t)

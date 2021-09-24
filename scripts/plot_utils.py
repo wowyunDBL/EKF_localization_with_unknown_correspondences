@@ -135,7 +135,7 @@ def plot_traj(true_states, belief_states, markers, markers_in_map, index, np_z_h
     plt.yticks(fontsize=20)
     plt.xticks(fontsize=20)
     plt.legend(fontsize=15)
-    # plt.show()
+    plt.show()
     # fig.savefig('/home/ncslaber/class_material/EKF_localization_with_unknown_correspondences/images/sample_5_times/'+str(index)+'.png')
 
 def plot_measured_landmarks(np_z_hat, np_z_true, bel_pose, real_pose):
@@ -237,10 +237,3 @@ def plot_transformed(P, U, robot_pose, theta, count):
     plt.legend(fontsize=15)
     plt.show()
     
-
-
-file_path = '/home/anny/110-1/zigzag_bag/'
-with open(file_path + 'cb_pose.csv', 'r') as csvfile:
-    robot_pose_gps = list( csv.reader(csvfile, delimiter=',') )
-    robot_pose_gps = np.array(robot_pose_gps).astype(float)
-print(robot_pose_gps.shape)

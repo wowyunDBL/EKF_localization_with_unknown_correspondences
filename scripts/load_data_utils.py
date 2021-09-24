@@ -6,29 +6,29 @@ from pyproj import Proj
 
 def get_landmark():
 
-    lm_x = []
-    lm_y = []
-    lm_radi = []
-    ''' load landmark map '''
-    directory = '/home/ncslaber/mapping_node/mapping_ws/src/mapping_explorer/NTU_allMaps/'
-    files_to_check = ['210906_loopClosure']
-    file_path_map = directory+files_to_check[0]
-    shp_path = file_path_map + '/shapefiles/'
+    # lm_x = []
+    # lm_y = []
+    # lm_radi = []
+    # ''' load landmark map '''
+    # directory = '/home/ncslaber/mapping_node/mapping_ws/src/mapping_explorer/NTU_allMaps/'
+    # files_to_check = ['210906_loopClosure']
+    # file_path_map = directory+files_to_check[0]
+    # shp_path = file_path_map + '/shapefiles/'
 
-    for i in range(0,2):
-        center = np.load(shp_path+'center_'+str(i+1)+'_bd_utm.npy')
-        if center is None:
-            print("neg_bd is empty!!")
-            continue
-        else: 
-            lm_x.append(center[0])
-            lm_y.append(center[1])
-            lm_radi.append(center[2])
-            print('load landmark map successfully with size = ', lm_x.shape)
+    # for i in range(0,2):
+    #     center = np.load(shp_path+'center_'+str(i+1)+'_bd_utm.npy')
+    #     if center is None:
+    #         print("neg_bd is empty!!")
+    #         continue
+    #     else: 
+    #         lm_x.append(center[0])
+    #         lm_y.append(center[1])
+    #         lm_radi.append(center[2])
+    #         print('load landmark map successfully with size = ', len(lm_x))
     
-    # lm_x = [-7,2,3,5,6,6,3] 
-    # lm_y = [8,7,6,5,4,-4,-6] 
-    # lm_radi = [0.2, 0.5, 0.3, 0.2, 0.5, 0.3, 0.4]
+    lm_x = [-7,2,3,5,6,6,3] 
+    lm_y = [8,7,6,5,4,-4,-6] 
+    lm_radi = [0.2, 0.5, 0.3, 0.2, 0.5, 0.3, 0.4]
     
     
     return lm_x, lm_y, lm_radi
@@ -73,9 +73,10 @@ def get_observed_lm_for_sim(mu_bar, global_lm):
         diff_theta = arctan2(diff_y, diff_x) - mu_bar[2]
 
         if diff_theta > -FOV and diff_theta < FOV:
-            obs_lm_x.append( global_lm[0][i])
-            obs_lm_y.append( global_lm[1][i])
-            obs_lm_radi.append( global_lm[2][i])
+            if diff_x*diff_x+diff_y*diff_y < 64:
+                obs_lm_x.append( global_lm[0][i])
+                obs_lm_y.append( global_lm[1][i])
+                obs_lm_radi.append( global_lm[2][i])
                 
     return obs_lm_x, obs_lm_y, obs_lm_radi
 

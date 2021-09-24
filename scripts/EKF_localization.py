@@ -35,8 +35,8 @@ def get_mu_bar_odom_modle(prev_mu, u):
     x_hat, y_hat, t_hat = odom_hat
     print('x_hat, y_hat, t_hat: ', x_hat, y_hat, t_hat)
 
-    diff_x = prev_x_hat - x_hat
-    diff_y = prev_y_hat - y_hat
+    diff_x = x_hat - prev_x_hat 
+    diff_y = y_hat - prev_y_hat  
 
     delta_rot1 = arctan2(diff_y, diff_x) - prev_t_hat
     delta_trans = np.sqrt((diff_x ** 2) + (diff_y ** 2))
@@ -44,7 +44,7 @@ def get_mu_bar_odom_modle(prev_mu, u):
 
     m = np.array([[ delta_trans*cos(angle+delta_rot1) ],
                   [ delta_trans*sin(angle+delta_rot1) ],
-                  [ delta_rot1 + delta_rot2]])
+                  [ angle + delta_rot1 + delta_rot2]])
 
     return prev_mu + m
 
@@ -87,15 +87,16 @@ def get_predict_lm_measure_and_likelihood(diff_x, diff_y, bel_theta, z_true,  m_
                         [m_j_radi] ])
     if z_hat[1,0] > np.pi:
         z_hat[1,0] = z_hat[1,0] - 2*np.pi
+
     H_t = np.array([ [-diff_x / np.sqrt(q), -diff_y / np.sqrt(q), 0],
                         [diff_y / q, -diff_x / q, -1],
                         [0,0,0] ])
     S_t = (H_t @ sigma_bar @ (H_t.T)) + Q_t
     
-
+    print("z_hat: ", z_hat)
     diff_z = z_true-z_hat
     diff_z[2,0] *= weight_feature
-    likelihood = np.sqrt(np.linalg.det(2*np.pi*S_t)) * math.exp(-0.5*(diff_z).T)@(np.linalg.inv(S_t))@diff_z))
+    likelihood = np.sqrt(np.linalg.det(2*np.pi*S_t)) * math.exp(-0.5*((z_true-z_hat).T)@(np.linalg.inv(S_t))@(z_true-z_hat))
 
     return z_hat, H_t, S_t, likelihood 
 

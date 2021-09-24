@@ -257,7 +257,7 @@ if __name__ == "__main__":
                 P = np.vstack((lm_x, lm_y))
                 U = np.vstack((obs_lm_utm_x, obs_lm_utm_y)) #############(obs_lm_x, obs_lm_y)
                 
-                cols = get_Rt_by_ICP( P,U)
+                cols = get_Rt_by_ICP(P,U)
         
                 '''iterative update predict measurement'''
                 for k in range(len(obs_lm_x)):
