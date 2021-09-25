@@ -11,10 +11,30 @@ make
 ## tree
 ```bash
 ├── scripts
-│   ├── ekf_with_icp_unknown.py
-│   └── ekf_with_mixLikelihood.py
+│   ├── EKF_localization.py  # module
+│   ├── ekf_with_icp_unknown.py  # sim
+│   ├── ekf_with_KF_GPS.py  # sim
+│   ├── ekf_with_lm_and_odom.py  # sim
+│   ├── ekf_with_lm_and_odom_realData.py
+│   ├── ekf_with_mixLikelihood.py  # sim
+│   ├── find_trunk_center.py
+│   ├── ICP_correspondences.py  # module
+│   ├── load_data_utils.py  # module
+│   ├── plot_utils.py  # module
 └── src
     └── EKF_localization.h
+
+.
+├── cb_pose.csv  #/outdoor_waypoint_nav/odometry/filtered
+├── cb_pose_filter_map.csv #/outdoor_waypoint_nav/odometry/filtered_map
+├── cb_pose_lat_lon_theta.csv #/outdoor_waypoint_nav/gps/filtered
+├── color/  # saved bgr npy
+├── depth/
+├── found_center/ # trunk center of utm
+├── found_center_filtered_map/
+├── index_timestamp.csv
+├── index_timestamp_filter_map.csv
+└── TMP
 ```
 
 ## Usage

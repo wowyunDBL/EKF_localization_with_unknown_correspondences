@@ -18,7 +18,7 @@ if sys.platform.startswith('linux'): # or win
     file_path = "/home/ncslaber/110-1/210922_EKF-fusion-test/zigzag_bag/"
 
 
-for AA in range(100):
+for AA in range(3627):
     ''' show raw data '''
     npDepth = np.load(file_path+"depth/"+str(AA)+".npy")
     npColor = np.load(file_path+"color/"+str(AA)+".npy")
@@ -72,7 +72,7 @@ for AA in range(100):
     centre_y_list = []
     radius_r_list = []
     circle_bd = np.zeros(hieght_or.shape, dtype=np.uint8)
-    print('>>>>num_objects:',num_objects)
+    # print('>>>>num_objects:',num_objects)
     for i in range(num_objects-1):
         A = []
         for x in range(200):
@@ -80,7 +80,7 @@ for AA in range(100):
                 if labels[x][y] == i+1:
                     A.append(np.array([-x/(x*x+y*y), -y/(x*x+y*y), -1/(x*x+y*y)]))
         A = np.asarray(A)
-        print('# of points: ',A.shape)
+        # print('# of points: ',A.shape)
         if A.shape[0] < 10:
             continue
 
@@ -90,7 +90,7 @@ for AA in range(100):
         centre_x = k[0][0]/(-2)
         centre_y = k[1][0]/(-2)
         radius_r = np.sqrt(centre_x*centre_x+centre_y*centre_y-k[2][0])
-        print('x,y,r: ', int(centre_x+0.5), int(centre_y+0.5), int(radius_r+0.5))
+        # print('x,y,r: ', int(centre_x+0.5), int(centre_y+0.5), int(radius_r+0.5))
         
         cv2.circle(circle_bd,(int(centre_y+0.5), int(centre_x+0.5)), int(radius_r+0.5), 150, 2)
         
@@ -112,12 +112,12 @@ for AA in range(100):
 
     ''' load robot current pose '''
     file_path = '/home/ncslaber/110-1/210922_EKF-fusion-test/zigzag_bag/'
-    with open(file_path + 'cb_pose.csv', 'r') as csvfile:
+    with open(file_path + 'cb_pose_lat_lon_theta.csv', 'r') as csvfile:
         robot_pose_gps = list( csv.reader(csvfile, delimiter=',') )
         robot_pose_gps = np.array(robot_pose_gps).astype(float)
     
     lat = robot_pose_gps[AA,0]
-    print(lat)
+    # print(lat)
     lng = robot_pose_gps[AA,1]
     imu_yaw = robot_pose_gps[AA,2]
     

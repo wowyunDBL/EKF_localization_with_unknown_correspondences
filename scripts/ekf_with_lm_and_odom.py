@@ -28,6 +28,7 @@ import ICP_correspondences
     
 
 def get_noise_landmark_xy(z_true, robot_pose):
+    '''use this noise obs to match in map'''
     (real_x, real_y, real_tehta) = robot_pose
     r_x = z_true[0][0] * cos(z_true[1][0])
     r_y = z_true[0][0] * sin(z_true[1][0])
@@ -102,15 +103,21 @@ if __name__ == "__main__":
         print(">>>>new ietration: "+str(i))
         flag = False
         icp_flag = False
+
+        prev_theta = mu_theta[0,i-1]
         
         '''prediction step'''
         prev_odom_hat = np.array([ [x_pos_true[0, i-1]], [y_pos_true[0, i-1]], [theta_pos_true[0, i-1]] ])
         odom_hat = np.array([ [x_pos_true[0, i]], [y_pos_true[0, i]], [theta_pos_true[0, i]] ])
         # odom_hat += make_noise(R_t)
+        # print((prev_odom_hat, odom_hat))
 
         mu_bar = EKF_localization.get_mu_bar_odom_modle(mu, (prev_odom_hat, odom_hat))
-        # mu = np.array([ [x_pos_true[0,i]],[y_pos_true[0,i]],[theta_pos_true[0,i]] ])
-        sigma_bar = (G_t @ sigma @ (G_t.T)) + (V_t @ M_t @ (V_t.T))
+        
+
+        G_t = EKF_localization.get_G_t_odom((prev_odom_hat, odom_hat), prev_theta)
+        sigma_bar = (G_t @ sigma @ (G_t.T)) #+ (V_t @ M_t @ (V_t.T))
+        print('sigma_bar: ', sigma_bar)
 
         '''correction (updating belief based on landmark readings)'''
         bel_x = mu_bar[0,0]
@@ -279,7 +286,7 @@ if __name__ == "__main__":
                 U = np.vstack((np_obs_x_m_noise, np_obs_y_m_noise)) #############(obs_lm_x, obs_lm_y)
                 robot_xy = np.array([ [real_x],
                                       [real_y] ])
-                cols = ICP_correspondences.get_Rt_by_ICP( P,U, robot_xy, real_tehta )
+                cols = ICP_correspondences.get_Rt_by_ICP( P,U)
         
                 '''iterative update predict measurement'''
                 for k in range(len(obs_lm_x)):
@@ -293,7 +300,7 @@ if __name__ == "__main__":
                     
                     z_hat, H_t, S_t \
                         = EKF_localization.get_predict_lm_measure(diff_x, diff_y, bel_theta, m_j_radi, sigma_bar, Q_t)
-                                        
+                    print('H_t: ', H_t)                    
                     '''kalman gain and update belief'''
                     K_t = sigma_bar @ (H_t.T) @ np.linalg.inv(S_t)
                     print('K: ',K_t)
@@ -311,7 +318,9 @@ if __name__ == "__main__":
 
         '''update belief'''
         mu = mu_bar
+        print('mu: ', mu)
         sigma = sigma_bar
+        print('sigma: ', sigma)
         mu_x[0 , i] = mu[0 , 0]
         mu_y[0 , i] = mu[1 , 0]
         mu_theta[0 , i] = mu[2 , 0]
@@ -321,11 +330,11 @@ if __name__ == "__main__":
         if  flag==True: #len(obs_lm_x) != 0:
             # print("difference btw mu_bar and robot_xy_new: ", mu_bar, robot_xy_new)
             # tmp = (mu_bar[:2,0] - robot_xy_new[:,0])
-            plot_utils.plot_traj((x_pos_true, y_pos_true, theta_pos_true), (mu_x, mu_y, mu_theta), (obs_lm_x, obs_lm_y, obs_lm_radi),(lm_x,lm_y,lm_radi),i, \
+            plot_utils.plot_traj_for_sim((x_pos_true, y_pos_true, theta_pos_true), (mu_x, mu_y, mu_theta), (obs_lm_x, obs_lm_y, obs_lm_radi),(lm_x,lm_y,lm_radi),i, \
                         np_z_hat, np_z_true, (bel_x, bel_y, bel_theta), (real_x, real_y, real_tehta), cols, icp_flag) 
             
         
         if i%10 == 0:
-            plot_utils.plot_traj((x_pos_true, y_pos_true, theta_pos_true), (mu_x, mu_y, mu_theta), (obs_lm_x, obs_lm_y, obs_lm_radi),(lm_x,lm_y,lm_radi),i, \
+            plot_utils.plot_traj_for_sim((x_pos_true, y_pos_true, theta_pos_true), (mu_x, mu_y, mu_theta), (obs_lm_x, obs_lm_y, obs_lm_radi),(lm_x,lm_y,lm_radi),i, \
                         np_z_hat, np_z_true, (bel_x, bel_y, bel_theta), (real_x, real_y, real_tehta), cols, icp_flag) 
     

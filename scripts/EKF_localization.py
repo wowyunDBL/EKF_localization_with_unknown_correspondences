@@ -27,25 +27,39 @@ def get_mu_bar(prev_mu, velocity, omega, angle, dt):
                   [omega*dt]])
     return prev_mu + m
 
-def get_mu_bar_odom_modle(prev_mu, u):
+def get_mu_bar_odom_modle(prev_mu, u, north_heading=False):
     '''hat means in odom frame'''
     angle = prev_mu[2,0]
+    print("prev_mu: ", prev_mu)
     prev_odom_hat, odom_hat = u
-    prev_x_hat, prev_y_hat, prev_t_hat = prev_odom_hat
-    x_hat, y_hat, t_hat = odom_hat
+    prev_x_hat, prev_y_hat, prev_t_hat = prev_odom_hat[:,0]
+    x_hat, y_hat, t_hat = odom_hat[:,0]
     print('x_hat, y_hat, t_hat: ', x_hat, y_hat, t_hat)
+    print('prev_x_hat, prev_y_hat, prev_t_hat: ', prev_x_hat, prev_y_hat, prev_t_hat)
 
     diff_x = x_hat - prev_x_hat 
     diff_y = y_hat - prev_y_hat  
 
-    delta_rot1 = arctan2(diff_y, diff_x) - prev_t_hat
-    delta_trans = np.sqrt((diff_x ** 2) + (diff_y ** 2))
-    delta_rot2 = t_hat - prev_t_hat - delta_rot1
+    if north_heading == True:
+        delta_rot1 = arctan2(diff_y, diff_x) - prev_t_hat
+        delta_trans = np.sqrt((diff_x ** 2) + (diff_y ** 2))
+        delta_rot2 = t_hat - prev_t_hat - delta_rot1
+        print("angle+delta_rot1:", angle+delta_rot1)
+        m = np.array([[-delta_trans*sin(angle+delta_rot1) ],
+                      [ delta_trans*cos(angle+delta_rot1) ],
+                      [ delta_rot1 + delta_rot2] ])
 
-    m = np.array([[ delta_trans*cos(angle+delta_rot1) ],
-                  [ delta_trans*sin(angle+delta_rot1) ],
-                  [ angle + delta_rot1 + delta_rot2]])
+    else:
+        delta_rot1 = arctan2(diff_y, diff_x) - prev_t_hat
+        delta_trans = np.sqrt((diff_x ** 2) + (diff_y ** 2))
+        delta_rot2 = t_hat - prev_t_hat - delta_rot1
 
+        m = np.array([[ delta_trans*cos(angle+delta_rot1) ],
+                      [ delta_trans*sin(angle+delta_rot1) ],
+                      [ delta_rot1 + delta_rot2] ])
+    print('prev_mu + m: ', prev_mu + m)
+    # print('m: ', m)
+    # print('prev_mu: ', prev_mu)
     return prev_mu + m
 
 
@@ -53,6 +67,23 @@ def get_G_t(v, w, angle, dt):
     return np.array([
                     [1, 0, ( (-v/w)*cos(angle) ) + ( (v/w)*cos(angle + (w*dt)) ) ],
                     [0, 1, ( (-v/w)*sin(angle) ) + ( (v/w)*sin(angle + (w*dt)) ) ],
+                    [0, 0, 1]
+                    ])
+
+def get_G_t_odom(u, angle):
+    prev_odom_hat, odom_hat = u
+    prev_x_hat, prev_y_hat, prev_t_hat = prev_odom_hat[:,0]
+    x_hat, y_hat, t_hat = odom_hat[:,0]
+
+    diff_x = x_hat - prev_x_hat 
+    diff_y = y_hat - prev_y_hat
+
+    delta_rot1 = arctan2(diff_y, diff_x) - prev_t_hat  
+    delta_trans = np.sqrt((diff_x ** 2) + (diff_y ** 2))
+
+    return np.array([
+                    [1, 0, -delta_trans*sin(angle+delta_rot1)],
+                    [0, 1, delta_trans*cos(angle+delta_rot1)],
                     [0, 0, 1]
                     ])
 
@@ -117,4 +148,7 @@ def get_predict_lm_measure(diff_x, diff_y, bel_theta, m_j_radi, sigma_bar, Q_t):
     return z_hat, H_t, S_t
 
 if __name__ == '__main__':
+    prev_mu = np.array([ [-5],[-3],[ 1.57079633] ])
+    u = ( np.array([ [-5],[-3],[ 1.57079633] ]), np.array([ [-5.00185229],[-2.96362823],[ 1.67256138] ]) )
+    get_mu_bar_odom_modle(prev_mu, u)
     pass
