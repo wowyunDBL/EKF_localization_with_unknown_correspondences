@@ -98,7 +98,7 @@ if __name__ == "__main__":
     mu = np.array([ [mu_x[0,99]],[mu_y[0,99]],[mu_theta[0,99]] ])
     
     for i in range(100,3627):
-        print(">>>>new ietration: "+str(i))
+        print(">>>>new iteration: "+str(i))
         flag = False
         icp_flag = False
         
