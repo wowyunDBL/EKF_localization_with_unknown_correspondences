@@ -49,7 +49,7 @@ def get_observed_lm(file_path, index):
     obs_lm_radi = obs_lm_radi/ 10  # should be 20
     for c in range( len(obs_lm_x) ):
         diff_x = obs_lm_x[c] 
-        diff_y = obs_lm_y[c] 
+        diff_y = obs_lm_y[c] + 5
         diff_theta = arctan2(diff_y, diff_x)
 
         q = (diff_x ** 2) + (diff_y ** 2)
@@ -63,6 +63,15 @@ def get_observed_lm(file_path, index):
     np_z_true = np_z_true.T    
 
     return np_z_true, obs_lm_utm_x, obs_lm_utm_y, obs_lm_radi
+
+def get_observed_lm_relative_pose(file_path, index):
+    
+    obs_lm_x = np.load(file_path+"found_center/"+str(index)+'-q_x.npy')
+    obs_lm_y = np.load(file_path+"found_center/"+str(index)+'-q_y.npy')
+    obs_lm_radi = np.load(file_path+"found_center/"+str(index)+'-r.npy')
+    obs_lm_radi = obs_lm_radi/ 10  # should be 20
+
+    return obs_lm_x, obs_lm_y, obs_lm_radi
 
 def get_observed_lm_for_sim(mu_bar, global_lm):
     obs_lm_x = []
@@ -84,18 +93,10 @@ def get_observed_lm_for_sim(mu_bar, global_lm):
 
 def get_filtered_map_pose(file_path):
     
-    with open(file_path + 'cb_pose.csv', 'r') as csvfile:
+    with open(file_path + 'cb_pose_filter_map-xyt.csv', 'r') as csvfile:
         robot_pose_gps = list( csv.reader(csvfile, delimiter=',') )
         robot_pose_gps = np.array(robot_pose_gps).astype(float)
     print("load filtered_map_pose size = ", robot_pose_gps.shape)
-    '''project from gps to utm
-    lat = robot_pose_gps[:,0]
-    lng = robot_pose_gps[:,1]
-    _, _, zone, R = utm.from_latlon(lat, lng)
-    proj = Proj(proj='utm', zone=zone, ellps='WGS84', preserve_units=False)
-    filtered_map_x, filtered_map_y = proj(lng, lat)
-    filtered_map_x.shape = (1,-1)
-    filtered_map_y.shape = (1,-1)'''
 
     filtered_map_x = robot_pose_gps[:,0]
     filtered_map_y = robot_pose_gps[:,1]
@@ -104,8 +105,31 @@ def get_filtered_map_pose(file_path):
     '''load yaw (0 is north)'''
     filtered_map_t = robot_pose_gps[:,2]
     filtered_map_t.shape = (1,-1)
+    
+    filtered_map_x = filtered_map_x - filtered_map_x[0,0]
+    filtered_map_y = filtered_map_y - filtered_map_y[0,0]
 
     return filtered_map_x, filtered_map_y, filtered_map_t
+
+def get_filtered_pose(file_path):
+
+    with open(file_path + 'cb_pose_filtered-xyt.csv', 'r') as csvfile:
+        robot_pose_gps = list( csv.reader(csvfile, delimiter=',') )
+        robot_pose_gps = np.array(robot_pose_gps).astype(float)
+    print("load filtered_pose size = ", robot_pose_gps.shape)
+    
+    filtered_x = robot_pose_gps[:,0]
+    filtered_y = robot_pose_gps[:,1]
+    filtered_x.shape = (1,-1)
+    filtered_y.shape = (1,-1)
+    '''load yaw (0 is north)'''
+    filtered_t = robot_pose_gps[:,2]
+    filtered_t.shape = (1,-1)
+
+    filtered_x = filtered_x - filtered_x[0,0]
+    filtered_y = filtered_y - filtered_y[0,0]
+
+    return filtered_x, filtered_y, filtered_t
 
 def get_GPS(file_path):
     
@@ -129,7 +153,14 @@ def get_GPS(file_path):
     return filtered_map_x, filtered_map_y, filtered_map_t
 
 
-def generate_ground_truth(t):
+def generate_ground_truth(t, dt):
+
+    '''command velocity'''
+    v_c = 1 + 0.5*cos(2*np.pi*(0.2)*t)
+    omg_c = -0.2 + 2*cos(2*np.pi*(1)*t)
+    '''noise in the command velocities (translational and rotational)'''
+    alpha = np.array([.1, .01, .01, .1])
+    alpha_1, alpha_2, alpha_3, alpha_4 = alpha
 
     x_pos_true = np.zeros(t.shape)
     y_pos_true = np.zeros(t.shape)
@@ -156,3 +187,8 @@ def generate_ground_truth(t):
     np.save('/home/ncslaber/class_material/EKF_localization_with_unknown_correspondences/data_ground_truth/theta_pos_true', theta_pos_true)
 
     return x_pos_true, y_pos_true, theta_pos_true
+
+if __name__ == '__main__':
+
+    file_path = '/home/ncslaber/110-1/210922_EKF-fusion-test/zigzag_bag/'
+    get_filtered_map_pose(file_path)
