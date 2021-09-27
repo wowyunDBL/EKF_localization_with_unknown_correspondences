@@ -91,10 +91,17 @@ if __name__ == "__main__":
     mu_hat_y[0,0] = mu_y[0,0]
     mu_hat_theta[0,0] = mu_theta[0,0]
 
+    mu_hat_lm_x = np.zeros(t.shape)
+    mu_hat_lm_y = np.zeros(t.shape)
+    mu_hat_lm_theta = np.zeros(t.shape)   # radians
+    mu_hat_lm_x[0,0] = mu_x[0,0]
+    mu_hat_lm_y[0,0] = mu_y[0,0]
+    mu_hat_lm_theta[0,0] = mu_theta[0,0]
+
     '''# of observed landmarks'''
     obs_lm_number = np.zeros(t.shape)
     cols=[]
-
+    np_diff_z_filtered_map = np.array([])
     
     '''run EKF'''
     mu = np.array([ [mu_x[0,99]],[mu_y[0,99]],[mu_theta[0,99]] ])
@@ -133,7 +140,7 @@ if __name__ == "__main__":
 
         ''' find correspondence'''
         if len(obs_lm_utm_x) > 0: 
-            flag = True
+            
             if len(obs_lm_utm_x) <= 2:
                 if len(obs_lm_utm_x) == 0: ##########
                     ''' find correspondence by maximum likelihood '''
@@ -203,6 +210,7 @@ if __name__ == "__main__":
                     np_z_hat=np.append(np_z_hat,z_hat)
 
                 elif len(obs_lm_utm_x) == 2:
+                    flag = True
                     print('>>>> find correspondence by maximum likelihood 2')
                     P = np.vstack((lm_x, lm_y))
                     U = np.vstack((obs_lm_utm_x, obs_lm_utm_y))
@@ -314,8 +322,9 @@ if __name__ == "__main__":
             #         np_z_hat=np.append(np_z_hat,z_hat)
             np_z_hat = np.reshape(np_z_hat, (-1,3))
             np_z_hat = np_z_hat.T
-
-        
+        if flag == True:
+            obs_lm_number[0,i] = 2
+        mu_hat_lm_x[0,i], mu_hat_lm_y[0,i], mu_hat_lm_theta[0,i] = mu_bar[0,0],mu_bar[1,0],mu_bar[2,0]
         '''update by GPS'''
         z_true = np.array([ [-filtered_map_y[0, i]],
                             [filtered_map_x[0, i]],
@@ -331,6 +340,7 @@ if __name__ == "__main__":
         z_hat = mu_bar - np.array([ [mu_x[0,99]], [mu_y[0,99]], [0] ])
         print("KF-z_hat: ", z_hat)
         mu_bar = mu_bar+K_t@(z_true-z_hat)
+        np_diff_z_filtered_map = np.append(np_diff_z_filtered_map, (z_true-z_hat))
         print("KF-(z_true-z_hat): ", z_true-z_hat)
         sigma_bar = (np.identity(sigma_bar.shape[0])-(K_t @ C)) @ sigma_bar
 
@@ -362,9 +372,8 @@ if __name__ == "__main__":
             # plot_utils.plot_traj( (mu_hat_x, mu_hat_y, mu_hat_theta),(utm_x_loc_origin, utm_y_loc_origin, utm_t_loc_origin), (mu_x, mu_y, mu_theta), (obs_lm_utm_x, obs_lm_utm_y, obs_lm_radi),(lm_x,lm_y,lm_radi),i, \
             #         np_z_hat, np_z_true, cols, icp_flag, flag) 
         # plot_traj(gps_states, belief_states, update_states, markers, markers_in_map, index, np_z_hat, np_z_true, cols, icp_flag, flag):
-    # np.save('/home/ncslaber/class_material/EKF_localization_with_unknown_correspondences/data_ground_truth/mu_x', mu_x)
-    # np.save('/home/ncslaber/class_material/EKF_localization_with_unknown_correspondences/data_ground_truth/mu_y', mu_y)
-    # np.save('/home/ncslaber/class_material/EKF_localization_with_unknown_correspondences/data_ground_truth/mu_theta', mu_theta)
-    # np.save('/home/ncslaber/class_material/EKF_localization_with_unknown_correspondences/data_ground_truth/obs_lm_number', obs_lm_number)
-    # np.save('/home/ncslaber/class_material/EKF_localization_with_unknown_correspondences/data_ground_truth/obs_lm_vector', np_z_true)
     
+    np_diff_z_filtered_map = np.reshape( np_diff_z_filtered_map, (-1,3) )
+    np_diff_z_filtered_map = np_diff_z_filtered_map.T
+
+    plot_utils.plot_respect_to_time( (mu_hat_x, mu_hat_y, mu_hat_theta), (mu_hat_lm_x, mu_hat_lm_y, mu_hat_lm_theta), (mu_x, mu_y, mu_theta), obs_lm_number )
