@@ -30,12 +30,12 @@ def get_mu_bar(prev_mu, velocity, omega, angle, dt):
 def get_mu_bar_odom_modle(prev_mu, u, north_heading=False):
     '''hat means in odom frame'''
     angle = prev_mu[2,0]
-    print("prev_mu: ", prev_mu)
+    # print("prev_mu: ", prev_mu)
     prev_odom_hat, odom_hat = u
     prev_x_hat, prev_y_hat, prev_t_hat = prev_odom_hat[:,0]
     x_hat, y_hat, t_hat = odom_hat[:,0]
-    print('x_hat, y_hat, t_hat: ', x_hat, y_hat, t_hat)
-    print('prev_x_hat, prev_y_hat, prev_t_hat: ', prev_x_hat, prev_y_hat, prev_t_hat)
+    # print('x_hat, y_hat, t_hat: ', x_hat, y_hat, t_hat)
+    # print('prev_x_hat, prev_y_hat, prev_t_hat: ', prev_x_hat, prev_y_hat, prev_t_hat)
 
     diff_x = x_hat - prev_x_hat 
     diff_y = y_hat - prev_y_hat  
@@ -44,7 +44,7 @@ def get_mu_bar_odom_modle(prev_mu, u, north_heading=False):
         delta_rot1 = arctan2(diff_y, diff_x) - prev_t_hat
         delta_trans = np.sqrt((diff_x ** 2) + (diff_y ** 2))
         delta_rot2 = t_hat - prev_t_hat - delta_rot1
-        print("angle+delta_rot1:", angle+delta_rot1)
+        # print("angle+delta_rot1:", angle+delta_rot1)
         m = np.array([[-delta_trans*sin(angle+delta_rot1) ],
                       [ delta_trans*cos(angle+delta_rot1) ],
                       [ delta_rot1 + delta_rot2] ])
@@ -57,7 +57,7 @@ def get_mu_bar_odom_modle(prev_mu, u, north_heading=False):
         m = np.array([[ delta_trans*cos(angle+delta_rot1) ],
                       [ delta_trans*sin(angle+delta_rot1) ],
                       [ delta_rot1 + delta_rot2] ])
-    print('prev_mu + m: ', prev_mu + m)
+    # print('prev_mu + m: ', prev_mu + m)
     # print('m: ', m)
     # print('prev_mu: ', prev_mu)
     return prev_mu + m

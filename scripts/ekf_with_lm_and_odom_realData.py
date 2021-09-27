@@ -39,16 +39,17 @@ if __name__ == "__main__":
     mu_x = np.zeros(t.shape)
     mu_y = np.zeros(t.shape)
     mu_theta = np.zeros(t.shape)   # radians
-    ''' starting belief - initial condition (robot pose of GPS)  
+    ''' starting belief - initial condition (robot pose of GPS) ''' 
     lat, lng = (25.01728203283927, 121.54163935542573)
     _, _, zone, R = utm.from_latlon(lat, lng)
     proj = Proj(proj='utm', zone=zone, ellps='WGS84', preserve_units=False)  
-    utm_x_init, utm_y_init = proj(lng, lat)'''
-    utm_x_init, utm_y_init = 352848.75, 2767652.8 #2767652.5
+    utm_x_init, utm_y_init = proj(lng, lat)
+    print(utm_x_init, utm_y_init)
+    # utm_x_init, utm_y_init = 352848.75, 2767652.8 #2767652.5
 
-    mu_x[0,99] = utm_x_init
-    mu_y[0,99] = utm_y_init
-    mu_theta[0,99] = filtered_map_t[0,99]
+    mu_x[0,0] = utm_x_init #99
+    mu_y[0,0] = utm_y_init #99
+    mu_theta[0,0] = filtered_map_t[0,0] #99
         # mu_x[0,0] = utm_x_init
         # mu_y[0,0] = utm_y_init
         # mu_theta[0,0] = filtered_map_t[0,0]
@@ -68,9 +69,9 @@ if __name__ == "__main__":
     lm_x, lm_y, lm_radi = load_data_utils.get_landmark_from_file()
     assert (len(lm_x)==len(lm_y))
     '''std deviation of range and bearing sensor noise for each landmark'''
-    std_dev_dist = .5
-    std_dev_phi = .5
-    std_dev_radi = .5
+    std_dev_dist = .05
+    std_dev_phi = .05
+    std_dev_radi = .05
     '''uncertainty due to measurement noise'''
     Q_t = np.array([ [std_dev_dist, 0, 0],
                      [0, std_dev_phi, 0],
@@ -104,9 +105,9 @@ if __name__ == "__main__":
     np_diff_z_filtered_map = np.array([])
     
     '''run EKF'''
-    mu = np.array([ [mu_x[0,99]],[mu_y[0,99]],[mu_theta[0,99]] ])
+    mu = np.array([ [mu_x[0,0]],[mu_y[0,0]],[mu_theta[0,0]] ]) #99
     
-    for i in range(100,3627):
+    for i in range(1,3625): #1/100
         print(">>>>new iteration: "+str(i))
         flag = False
         icp_flag = 0
@@ -125,7 +126,7 @@ if __name__ == "__main__":
         
         G_t = EKF_localization.get_G_t_odom((prev_odom_hat, odom_hat), prev_theta)
         sigma_bar = (G_t @ sigma @ (G_t.T)) #+ (V_t @ M_t @ (V_t.T))
-        print('sigma_bar: ', sigma_bar)
+        # print('sigma_bar: ', sigma_bar)
 
         '''correction (updating belief based on landmark readings)'''
         bel_x = mu_bar[0,0]
@@ -134,10 +135,10 @@ if __name__ == "__main__":
 
         '''measured landmarks'''
         np_z_true, obs_lm_utm_x, obs_lm_utm_y, obs_lm_radi = load_data_utils.get_observed_lm(file_path, i)
-        print('np_z_true: ', np_z_true)
+        # print('np_z_true: ', np_z_true)
 
         np_z_hat=np.array([[],[],[]])
-
+        a = -1
         ''' find correspondence'''
         if len(obs_lm_utm_x) > 0: 
             
@@ -146,15 +147,15 @@ if __name__ == "__main__":
                     ''' find correspondence by maximum likelihood '''
                     npLikelihood = np.array([])
                     list_z_hat, list_S_t, list_H_t = [],[],[]
-                    print('z_true: ', z_true)
+                    # print('z_true: ', z_true)
                     
                     print('>>>> find correspondence by maximum likelihood')
                     P = np.vstack((lm_x, lm_y))
                     U = np.vstack((obs_lm_utm_x, obs_lm_utm_y))
                     D = dist.cdist(U.T, P.T)
-                    print('D: ',D)
+                    # print('D: ',D)
                     cols = ICP_correspondences.get_correspondences_in_range(D[0], dist=2)
-                    print('radius under 2m: ',cols)
+                    # print('radius under 2m: ',cols)
                     if cols.shape[0] == 0:
                         print("under!")
                     for k in range(len(cols)):
@@ -190,11 +191,11 @@ if __name__ == "__main__":
                         continue
 
                     maxLikelihood = npLikelihood.argmax()
-                    print("matched lm: ", cols[maxLikelihood])
-                    print('z_true:', z_true)
-                    print('z_hat:', z_hat)
-                    print('z_true-z_hat:', z_true-z_hat)
-                    print('bel: ',(bel_x, bel_y, bel_theta))
+                    # print("matched lm: ", cols[maxLikelihood])
+                    # print('z_true:', z_true)
+                    # print('z_hat:', z_hat)
+                    # print('z_true-z_hat:', z_true-z_hat)
+                    # print('bel: ',(bel_x, bel_y, bel_theta))
                     
                     H_t = list_H_t.pop(maxLikelihood)
                     S_t = list_S_t.pop(maxLikelihood)
@@ -215,7 +216,7 @@ if __name__ == "__main__":
                     P = np.vstack((lm_x, lm_y))
                     U = np.vstack((obs_lm_utm_x, obs_lm_utm_y))
                     D = dist.cdist(U.T, P.T)
-                    print('D: ',D)
+                    # print('D: ',D)
 
                     '''iterative update predict measurement'''
                     for tmp in [0,1]:
@@ -225,7 +226,7 @@ if __name__ == "__main__":
                         list_S_t = []
                         list_H_t = []
                         cols = ICP_correspondences.get_correspondences_in_range(D[tmp], dist=2)
-                        print('cols: ', cols)
+                        # print('cols: ', cols)
                         if cols.shape[0] == 0:
                             print("under!")
                         for k in range(len(cols)):
@@ -245,7 +246,7 @@ if __name__ == "__main__":
                                                 diff_x, diff_y, bel_theta, z_true, m_j_radi, sigma_bar, Q_t, \
                                                 weight_feature=2)
                             
-                            print('z_true-z_hat:', z_true-z_hat)
+                            # print('z_true-z_hat:', z_true-z_hat)
                             npLikelihood = np.append(npLikelihood,likelihood)
                             list_z_hat.append(z_hat)
                             list_S_t.append(S_t)
@@ -262,8 +263,8 @@ if __name__ == "__main__":
                             mu_hat_x[0,i], mu_hat_y[0,i], mu_hat_theta[0,i] = bel_x, bel_y, bel_theta
                             continue
                         maxLikelihood = npLikelihood.argmax()
-                        print('npLikelihood: ',npLikelihood)
-                        print("matched lm: ", cols[maxLikelihood])
+                        # print('npLikelihood: ',npLikelihood)
+                        # print("matched lm: ", cols[maxLikelihood])
                         H_t = list_H_t.pop(maxLikelihood)
                         S_t = list_S_t.pop(maxLikelihood)
                         z_hat = list_z_hat.pop(maxLikelihood)
@@ -322,27 +323,29 @@ if __name__ == "__main__":
             #         np_z_hat=np.append(np_z_hat,z_hat)
             np_z_hat = np.reshape(np_z_hat, (-1,3))
             np_z_hat = np_z_hat.T
-        if flag == True:
+        if flag == True and i>1000:
             obs_lm_number[0,i] = 2
+            # input()
         mu_hat_lm_x[0,i], mu_hat_lm_y[0,i], mu_hat_lm_theta[0,i] = mu_bar[0,0],mu_bar[1,0],mu_bar[2,0]
+        
         '''update by GPS'''
         z_true = np.array([ [-filtered_map_y[0, i]],
                             [filtered_map_x[0, i]],
                             [filtered_map_t[0, i]]
                           ])
-        print("KF-z_true: ", z_true)
+        # print("KF-z_true: ", z_true)
         C = np.array([  [1,0,0],
                         [0,1,0],
                         [0,0,1]
                      ])
         S_t = (C @ sigma_bar @ (C.T)) + R_t
         K_t = sigma_bar @ (C.T) @ np.linalg.inv(S_t)
-        z_hat = mu_bar - np.array([ [mu_x[0,99]], [mu_y[0,99]], [0] ])
-        print("KF-z_hat: ", z_hat)
+        z_hat = mu_bar - np.array([ [mu_x[0,0]], [mu_y[0,0]], [0] ]) #99
+        # print("KF-z_hat: ", z_hat)
         mu_bar = mu_bar+K_t@(z_true-z_hat)
         np_diff_z_filtered_map = np.append(np_diff_z_filtered_map, (z_true-z_hat))
-        print("KF-(z_true-z_hat): ", z_true-z_hat)
-        sigma_bar = (np.identity(sigma_bar.shape[0])-(K_t @ C)) @ sigma_bar
+        # print("KF-(z_true-z_hat): ", z_true-z_hat)
+        sigma_bar = (np.identity(sigma_bar.shape[0])-(K_t @ C)) @ sigma_bar 
 
         '''update belief'''
         mu, sigma = mu_bar, sigma_bar
@@ -351,7 +354,7 @@ if __name__ == "__main__":
         mu_y[0 , i] = mu[1 , 0]
         mu_theta[0 , i] = mu[2 , 0]
         # obs_lm_number[0 , i] = len(np_z_hat)/3
-        print('UPDATED mu: ', mu)
+        # print('UPDATED mu: ', mu)
 
         mu_hat_x[0,i], mu_hat_y[0,i], mu_hat_theta[0,i] = bel_x, bel_y, bel_theta
          
@@ -366,7 +369,7 @@ if __name__ == "__main__":
         #     plot_traj((x_pos_true, y_pos_true, theta_pos_true), (mu_x, mu_y, mu_theta), (obs_lm_x, obs_lm_y, obs_lm_radi),(lm_x,lm_y,lm_radi),i, \
         #                 np_z_hat, np_z_true, (bel_x, bel_y, bel_theta), (real_x, real_y, real_tehta), cols, icp_flag, flag)   
         
-        if i%1200 == 0:
+        if i%1030 == 0:
             plot_utils.plot_traj( (filtered_utm_x,filtered_utm_y,filtered_utm_t), (mu_x, mu_y, mu_theta), (obs_lm_utm_x, obs_lm_utm_y, obs_lm_radi), (lm_x,lm_y,lm_radi),i, \
                 np_z_hat, np_z_true, (bel_x, bel_y, bel_theta), mu, cols, icp_flag)
             # plot_utils.plot_traj( (mu_hat_x, mu_hat_y, mu_hat_theta),(utm_x_loc_origin, utm_y_loc_origin, utm_t_loc_origin), (mu_x, mu_y, mu_theta), (obs_lm_utm_x, obs_lm_utm_y, obs_lm_radi),(lm_x,lm_y,lm_radi),i, \

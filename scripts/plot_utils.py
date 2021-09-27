@@ -250,11 +250,19 @@ def plot_transformed(P, U, robot_pose, theta, count):
 def plot_respect_to_time( mu_hat, mu_hat_lm, mu, obs_lm_number):
     (mu_hat_x, mu_hat_y, mu_hat_theta), (mu_hat_lm_x, mu_hat_lm_y, mu_hat_lm_theta), (mu_x, mu_y, mu_theta) \
         =  mu_hat, mu_hat_lm, mu
-    timestamp = mu_hat_x.shape[1]
+    # timestamp = np.array(range(mu_hat_x.shape[1]-1)) + 1
+    timestamp = np.array(range(3625)) + 1
+    timestamp1 = np.array(range(100-1,1627-1)) + 1
 
-    fig, ax = plt.subplots(figsize=(10,2),dpi=120)
-    plt.scatter(timestamp, mu_hat_x[0][1:], color='r', s=8, label='mu_hat')
-    plt.scatter(timestamp, mu_hat_lm_x[0][1:], color='g', s=10, label='mu_hat_lm')
-    plt.scatter(timestamp, mu_x[0][1:], color='b', s=13, label='mu')
-    plt.scatter(timestamp, obs_lm_number[0][1:], color='y', s=13, label='obs_lm_number')
+    fig, ax = plt.subplots(figsize=(25,8),dpi=160)
+        
+    # plt.scatter(timestamp, mu_x[0][99:1627], color='b', s=64, label='mu')
+    # plt.scatter(timestamp1, mu_hat_lm_x[0][100:1627], color='g', s=32, label='mu_hat_lm')
+    # plt.scatter(timestamp1, mu_hat_x[0][100:1627], color='r', s=8, label='mu_hat')
+    plt.scatter(timestamp, obs_lm_number[0][:3625], color='y', s=13, label='obs_lm_number')
+
+    plt.title('x vs. time', fontsize=25)
+    plt.yticks(fontsize=20)
+    plt.xticks(fontsize=20)
+    plt.legend(fontsize=15)
     plt.show()

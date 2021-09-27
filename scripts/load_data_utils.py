@@ -49,7 +49,7 @@ def get_observed_lm(file_path, index):
     obs_lm_radi = obs_lm_radi/ 10  # should be 20
     for c in range( len(obs_lm_x) ):
         diff_x = obs_lm_x[c] 
-        diff_y = obs_lm_y[c] + 5
+        diff_y = obs_lm_y[c] + 0.3
         diff_theta = arctan2(diff_y, diff_x)
 
         q = (diff_x ** 2) + (diff_y ** 2)
