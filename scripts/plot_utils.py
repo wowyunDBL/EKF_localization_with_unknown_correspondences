@@ -9,7 +9,7 @@ from scipy.spatial import distance as dist
 import matplotlib.pyplot as plt
 from matplotlib import animation
 
-def plot_traj(urs_states, belief_states, markers, markers_in_map, index, np_z_hat, np_z_true, prebel_pose, updated_pose, cols, icp_flag):
+def plot_traj_tmp(urs_states, belief_states, markers, markers_in_map, index, np_z_hat, np_z_true, prebel_pose, updated_pose, cols, icp_flag):
     x_urs, y_urs, th_urs = urs_states
     x_guess, y_guess, theta_guess = belief_states
     # x_tr_lm, y_tr_lm, th_tr_lm = lm_states
@@ -54,6 +54,82 @@ def plot_traj(urs_states, belief_states, markers, markers_in_map, index, np_z_ha
     plt.scatter(bel_x, bel_y, s=300, color='lightyellow', ec='k', label='z_hat pose')
     plt.plot( [bel_x, bel_x + radius*cos(bel_theta + np.pi/2) ], 
                [bel_y, bel_y + radius*sin(bel_theta + np.pi/2) ], color='k' )
+
+    '''plot observation z'''
+    plot_measured_landmarks(np_z_hat, np_z_true, prebel_pose, updated_pose)
+
+    '''plot traj'''
+    plt.scatter(x_urs[0], y_urs[0], color='b', label="GPS state", s=10)
+    plt.scatter(x_guess[0][100:index+1], y_guess[0][100:index+1], color='r', label="Predicted", s=10)
+      
+    if icp_flag == 0:
+        plt.text(352850, 2767653, 'No obs lm: '+str(cols),fontsize=14)
+    elif icp_flag == 1:
+        plt.text(352850, 2767653, 'matched 1point',fontsize=14)
+    elif icp_flag == 2:
+        plt.text(352850, 2767653, 'matched 2point',fontsize=14)
+    elif icp_flag == 3:
+        plt.text(352850, 2767653, 'ICP',fontsize=14)
+
+    
+    
+    '''plot obs lm
+    for i in range( len(markers[0]) ):
+        plt.plot([ markers[0][i],x_tr[0][index] ],
+                [ markers[1][i],y_tr[0][index] ], color='k')'''
+
+    plt.title('update times: '+str(index)+'/3627', fontsize=25)
+    plt.yticks(fontsize=20)
+    plt.xticks(fontsize=20)
+    # plt.legend(fontsize=15)
+    plt.show()
+    # fig.savefig('/home/ncslaber/110-1/210922_EKF-fusion-test/zigzag_bag_image/'+str(index)+'.png')
+
+def plot_traj(urs_states, belief_states, markers, markers_in_map, index, np_z_hat, np_z_true, prebel_pose, updated_pose, cols, icp_flag):
+    x_urs, y_urs, th_urs = urs_states
+    x_guess, y_guess, theta_guess = belief_states
+    # x_tr_lm, y_tr_lm, th_tr_lm = lm_states
+
+    radius = 0.5
+    
+    # world_bounds = [-15,10]
+    fig, ax = plt.subplots(figsize=(10,10),dpi=120)
+    # ax = plt.axes(xlim=world_bounds, ylim=world_bounds)
+    ax.set_aspect('equal')
+
+    '''plot landmarkers'''
+    plt.scatter(markers_in_map[0], markers_in_map[1], marker='X',s=100, color='g', label='ref landmarks')
+    number_of_point=12
+    piece_rad = np.pi/(number_of_point/2)
+    
+    for j in range( len(markers_in_map[0]) ):
+        neg_bd = []
+        for i in range(number_of_point+1):
+            neg_bd.append((markers_in_map[0][j]+markers_in_map[2][j]*np.cos(piece_rad*i), markers_in_map[1][j]+markers_in_map[2][j]*np.sin(piece_rad*i)))
+        neg_bd=np.asarray(neg_bd)
+        plt.plot(neg_bd[:,0], neg_bd[:,1], c='k', marker='.')
+
+    plt.scatter(markers[0], markers[1], marker='X',s=100, color='y', label='original obs landmarks')
+    # for j in range( len(markers[0]) ):
+    #     neg_bd = []
+    #     for i in range(number_of_point):
+    #         neg_bd.append((markers[0][j]+markers[2][j]*np.cos(piece_rad*i), markers[1][j]+markers[2][j]*np.sin(piece_rad*i)))
+    #     neg_bd=np.asarray(neg_bd)
+    #     plt.scatter(neg_bd[:,0], neg_bd[:,1], c='k', s=10)
+
+    
+    '''plot heading state'''
+    plt.scatter(x_urs[0][index],y_urs[0][index], s=300, color='lightblue', ec='k', label='URS pose')
+    plt.plot( [x_urs[0][index], x_urs[0][index] + radius*cos(th_urs[0][index] ) ], 
+               [y_urs[0][index], y_urs[0][index] + radius*sin(th_urs[0][index] ) ], color='k' )
+    plt.scatter(x_guess[0][index],y_guess[0][index], s=500, color='y', ec='k', label='Predicted pose')
+    plt.plot( [x_guess[0][index], x_guess[0][index] + radius*cos(theta_guess[0][index] ) ], 
+              [y_guess[0][index], y_guess[0][index] + radius*sin(theta_guess[0][index] ) ], color='k' )
+
+    bel_x, bel_y, bel_theta = prebel_pose
+    plt.scatter(bel_x, bel_y, s=300, color='lightyellow', ec='k', label='z_hat pose')
+    plt.plot( [bel_x, bel_x + radius*cos(bel_theta ) ], 
+               [bel_y, bel_y + radius*sin(bel_theta ) ], color='k' )
 
     '''plot observation z'''
     plot_measured_landmarks(np_z_hat, np_z_true, prebel_pose, updated_pose)
@@ -266,3 +342,5 @@ def plot_respect_to_time( mu_hat, mu_hat_lm, mu, obs_lm_number):
     plt.xticks(fontsize=20)
     plt.legend(fontsize=15)
     plt.show()
+
+# def 

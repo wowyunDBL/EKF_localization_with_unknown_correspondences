@@ -30,6 +30,19 @@ if __name__ == "__main__":
     filtered_map_x, filtered_map_y, filtered_map_t = load_data_utils.get_filtered_map_pose(file_path)
     filtered_utm_x, filtered_utm_y, filtered_utm_t = load_data_utils.get_GPS(file_path) 
     filtered_x, filtered_y, filtered_t = load_data_utils.get_filtered_pose(file_path)
+    print(len( filtered_t[0]) )
+    # plt.plot( filtered_t[0], color='b' )
+        # filtered_t += np.pi/2
+    # plt.plot( filtered_t[0], color='g' )
+        # filtered_t[ filtered_t>np.pi ] -= 2*np.pi
+    # plt.plot( filtered_t[0], color='r' )
+    # plt.show()
+
+    filtered_utm_t += np.pi/2
+    filtered_utm_t[ filtered_utm_t>np.pi ] -= 2*np.pi
+
+    filtered_map_t += np.pi/2
+    filtered_map_t[ filtered_map_t>np.pi ] -= 2*np.pi
         
     t = filtered_map_x.shape[1]
     t = np.arange(0, t, 1)
@@ -49,7 +62,7 @@ if __name__ == "__main__":
 
     mu_x[0,0] = utm_x_init #99
     mu_y[0,0] = utm_y_init #99
-    mu_theta[0,0] = filtered_map_t[0,0] #99
+    mu_theta[0,0] = filtered_utm_t[0,0] #99
         # mu_x[0,0] = utm_x_init
         # mu_y[0,0] = utm_y_init
         # mu_theta[0,0] = filtered_map_t[0,0]
@@ -79,7 +92,7 @@ if __name__ == "__main__":
     Q_t_tmp = np.array([ [std_dev_dist, 0, 0],
                      [0, std_dev_phi/20, 0],
                      [0, 0, std_dev_radi/20] ] )
-    std_dev_state = .5
+    std_dev_state = .05
     R_t = np.array([ [std_dev_state, 0, 0],
                      [0, std_dev_state, 0],
                      [0, 0, std_dev_state] ] )
@@ -121,8 +134,9 @@ if __name__ == "__main__":
         odom_hat = np.array([ [filtered_x[0, i]], [filtered_y[0, i]], [filtered_t[0, i]] ])
         # odom_hat += make_noise(R_t)
         # print((prev_odom_hat, odom_hat))
-
-        mu_bar = EKF_localization.get_mu_bar_odom_modle(mu, (prev_odom_hat, odom_hat), north_heading=True)
+        
+        mu_bar = EKF_localization.get_mu_bar_odom_modle(mu, (prev_odom_hat, odom_hat))  #, north_heading=True
+        print("mu_bar before: ", mu_bar)
         
         G_t = EKF_localization.get_G_t_odom((prev_odom_hat, odom_hat), prev_theta)
         sigma_bar = (G_t @ sigma @ (G_t.T)) #+ (V_t @ M_t @ (V_t.T))
@@ -140,7 +154,7 @@ if __name__ == "__main__":
         np_z_hat=np.array([[],[],[]])
         a = -1
         ''' find correspondence'''
-        if len(obs_lm_utm_x) > 0: 
+        if len(obs_lm_utm_x) > 10: 
             
             if len(obs_lm_utm_x) <= 2:
                 if len(obs_lm_utm_x) == 0: ##########
@@ -210,8 +224,8 @@ if __name__ == "__main__":
                     '''save estimated measured data'''
                     np_z_hat=np.append(np_z_hat,z_hat)
 
-                elif len(obs_lm_utm_x) == 2 and (i > 1500 or i < 1000):
-                    obs_lm_number[0,i] = 2
+                elif len(obs_lm_utm_x) == 2:
+                    
                     print('>>>> find correspondence by maximum likelihood 2')
                     P = np.vstack((lm_x, lm_y))
                     U = np.vstack((obs_lm_utm_x, obs_lm_utm_y))
@@ -325,9 +339,9 @@ if __name__ == "__main__":
             #         np_z_hat=np.append(np_z_hat,z_hat)
             np_z_hat = np.reshape(np_z_hat, (-1,3))
             np_z_hat = np_z_hat.T
-        # if flag == True and i>1000:
-            # obs_lm_number[0,i] = 2
-            # input()
+        if flag == True and i>1000:
+            obs_lm_number[0,i] = 2
+            input()
         mu_hat_lm_x[0,i], mu_hat_lm_y[0,i], mu_hat_lm_theta[0,i] = mu_bar[0,0],mu_bar[1,0],mu_bar[2,0]
         
         '''update by GPS'''
@@ -335,33 +349,39 @@ if __name__ == "__main__":
                             [filtered_map_x[0, i]],
                             [filtered_map_t[0, i]]
                           ])
-        # print("KF-z_true: ", z_true)
+        print("KF-z_true: ", z_true)
         C = np.array([  [1,0,0],
                         [0,1,0],
                         [0,0,1]
                      ])
         S_t = (C @ sigma_bar @ (C.T)) + R_t
         K_t = sigma_bar @ (C.T) @ np.linalg.inv(S_t)
-        z_hat = mu_bar - np.array([ [mu_x[0,0]], [mu_y[0,0]], [0] ]) #99
-        # print("KF-z_hat: ", z_hat)
-        mu_bar = mu_bar+K_t@(z_true-z_hat)
-        np_diff_z_filtered_map = np.append(np_diff_z_filtered_map, (z_true-z_hat))
-        # print("KF-(z_true-z_hat): ", z_true-z_hat)
-        sigma_bar = (np.identity(sigma_bar.shape[0])-(K_t @ C)) @ sigma_bar 
-
+        z_hat = mu_bar - np.array([ [mu_x[0,0]], [mu_y[0,0]], [0] ]) #99 #since theta is in global
+        print("KF-z_hat: ", z_hat)
         fflag = False
         if z_true[2,0]*z_hat[2,0] < 0:
-            fflag = True
+            # z_hat[2,0] = -z_hat[2,0]
+            # fflag = True
+            mu_bar = mu_bar+K_t@(z_true-z_hat)
+            np_diff_z_filtered_map = np.append(np_diff_z_filtered_map, (z_true-z_hat))
+            print("KF-(z_true-z_hat): ", z_true-z_hat)
+            sigma_bar = (np.identity(sigma_bar.shape[0])-(K_t @ C)) @ sigma_bar
+        else:
+            mu_bar = mu_bar+K_t@(z_true-z_hat)
+            np_diff_z_filtered_map = np.append(np_diff_z_filtered_map, (z_true-z_hat))
+            print("KF-(z_true-z_hat): ", z_true-z_hat)
+            sigma_bar = (np.identity(sigma_bar.shape[0])-(K_t @ C)) @ sigma_bar 
 
         '''update belief'''
         mu, sigma = mu_bar, sigma_bar
-        
+        print("mu_bar after: ", mu_bar)
         mu_x[0 , i] = mu[0 , 0]
         mu_y[0 , i] = mu[1 , 0]
         mu_theta[0 , i] = mu[2 , 0]
         # obs_lm_number[0 , i] = len(np_z_hat)/3
         # print('UPDATED mu: ', mu)
-
+        if mu_theta[0 , i] < -3.2:
+            fflag = True
         mu_hat_x[0,i], mu_hat_y[0,i], mu_hat_theta[0,i] = bel_x, bel_y, bel_theta
          
         '''check remapped landmark pose
@@ -374,9 +394,11 @@ if __name__ == "__main__":
         #     # tmp = (mu_bar[:2,0] - robot_xy_new[:,0])
         #     plot_traj((x_pos_true, y_pos_true, theta_pos_true), (mu_x, mu_y, mu_theta), (obs_lm_x, obs_lm_y, obs_lm_radi),(lm_x,lm_y,lm_radi),i, \
         #                 np_z_hat, np_z_true, (bel_x, bel_y, bel_theta), (real_x, real_y, real_tehta), cols, icp_flag, flag)   
-        
-        if i%400==0: #i%3500 == 0 : #or i%503 == 0
-            plot_utils.plot_traj_tmp( (filtered_utm_x,filtered_utm_y,filtered_utm_t), (mu_x, mu_y, mu_theta), (obs_lm_utm_x, obs_lm_utm_y, obs_lm_radi), (lm_x,lm_y,lm_radi),i, \
+        if fflag == True:
+            plot_utils.plot_traj( (filtered_utm_x,filtered_utm_y,filtered_utm_t), (mu_x, mu_y, mu_theta), (obs_lm_utm_x, obs_lm_utm_y, obs_lm_radi), (lm_x,lm_y,lm_radi),i, \
+                np_z_hat, np_z_true, (bel_x, bel_y, bel_theta), mu, cols, icp_flag)
+        if i%3500 == 0 : #or i% == 01113  503
+            plot_utils.plot_traj( (filtered_utm_x,filtered_utm_y,filtered_utm_t), (mu_x, mu_y, mu_theta), (obs_lm_utm_x, obs_lm_utm_y, obs_lm_radi), (lm_x,lm_y,lm_radi),i, \
                 np_z_hat, np_z_true, (bel_x, bel_y, bel_theta), mu, cols, icp_flag)
             # plot_utils.plot_traj( (mu_hat_x, mu_hat_y, mu_hat_theta),(utm_x_loc_origin, utm_y_loc_origin, utm_t_loc_origin), (mu_x, mu_y, mu_theta), (obs_lm_utm_x, obs_lm_utm_y, obs_lm_radi),(lm_x,lm_y,lm_radi),i, \
             #         np_z_hat, np_z_true, cols, icp_flag, flag) 

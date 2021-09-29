@@ -30,6 +30,7 @@ def get_mu_bar(prev_mu, velocity, omega, angle, dt):
 def get_mu_bar_odom_modle(prev_mu, u, north_heading=False):
     '''hat means in odom frame'''
     angle = prev_mu[2,0]
+    print('angle: ', angle)
     # print("prev_mu: ", prev_mu)
     prev_odom_hat, odom_hat = u
     prev_x_hat, prev_y_hat, prev_t_hat = prev_odom_hat[:,0]
@@ -51,16 +52,25 @@ def get_mu_bar_odom_modle(prev_mu, u, north_heading=False):
 
     else:
         delta_rot1 = arctan2(diff_y, diff_x) - prev_t_hat
+        print('prev_t_hat: ', prev_t_hat)
+        print('arctan2(diff_y, diff_x): ', arctan2(diff_y, diff_x))
         delta_trans = np.sqrt((diff_x ** 2) + (diff_y ** 2))
         delta_rot2 = t_hat - prev_t_hat - delta_rot1
+        print('t_hat: ', t_hat)
 
         m = np.array([[ delta_trans*cos(angle+delta_rot1) ],
                       [ delta_trans*sin(angle+delta_rot1) ],
                       [ delta_rot1 + delta_rot2] ])
-    # print('prev_mu + m: ', prev_mu + m)
-    # print('m: ', m)
-    # print('prev_mu: ', prev_mu)
-    return prev_mu + m
+    print('prev_mu + m: ', prev_mu + m)
+    print('m: ', m)
+    print('prev_mu: ', prev_mu)
+
+    mu = prev_mu + m
+    if mu[2,0]>np.pi:
+        mu[ 2,0 ] -= 2*np.pi
+    if mu[2,0]<-np.pi:
+        mu[ 2,0 ] += 2*np.pi
+    return mu
 
 
 def get_G_t(v, w, angle, dt):
@@ -113,6 +123,9 @@ def make_noise(cov_matrix):
 def get_predict_lm_measure_and_likelihood(diff_x, diff_y, bel_theta, z_true,  m_j_radi, sigma_bar, Q_t, weight_feature=1):
     
     q = (diff_x ** 2) + (diff_y ** 2)
+    # bel_theta += np.pi/2
+    # if bel_theta > np.pi:
+    #     bel_theta = bel_theta - 2*np.pi
     z_hat = np.array([ [np.sqrt(q)],
                         [arctan2(diff_y, diff_x) - bel_theta],
                         [m_j_radi] ])
@@ -125,6 +138,9 @@ def get_predict_lm_measure_and_likelihood(diff_x, diff_y, bel_theta, z_true,  m_
     S_t = (H_t @ sigma_bar @ (H_t.T)) + Q_t
     
     print("z_hat: ", z_hat)
+    print("z_true: ", z_true)
+    print('arctan2(diff_y, diff_x): ', arctan2(diff_y, diff_x))
+    print('bel_theta', bel_theta)
     diff_z = z_true-z_hat
     diff_z[2,0] *= weight_feature
     likelihood = np.sqrt(np.linalg.det(2*np.pi*S_t)) * math.exp(-0.5*((z_true-z_hat).T)@(np.linalg.inv(S_t))@(z_true-z_hat))
