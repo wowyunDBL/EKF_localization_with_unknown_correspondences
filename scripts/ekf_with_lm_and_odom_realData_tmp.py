@@ -31,10 +31,10 @@ if __name__ == "__main__":
     filtered_utm_x, filtered_utm_y, filtered_utm_t = load_data_utils.get_GPS(file_path) 
     filtered_x, filtered_y, filtered_t = load_data_utils.get_filtered_pose(file_path)
     print(len( filtered_t[0]) )
-    # plt.plot( filtered_t[0], color='b' )
-        # filtered_t += np.pi/2
+    plt.plot( filtered_t[0], color='b' )
+    # filtered_t += np.pi/2
     # plt.plot( filtered_t[0], color='g' )
-        # filtered_t[ filtered_t>np.pi ] -= 2*np.pi
+    #     filtered_t[ filtered_t>np.pi ] -= 2*np.pi
     # plt.plot( filtered_t[0], color='r' )
     # plt.show()
 
@@ -356,21 +356,14 @@ if __name__ == "__main__":
                      ])
         S_t = (C @ sigma_bar @ (C.T)) + R_t
         K_t = sigma_bar @ (C.T) @ np.linalg.inv(S_t)
-        z_hat = mu_bar - np.array([ [mu_x[0,0]], [mu_y[0,0]], [0] ]) #99 #since theta is in global
+        z_hat = np.array([ [mu_bar[0,0]-mu_x[0,0]], [mu_bar[1,0]-mu_y[0,0]], [mu_bar[2,0]] ]) #99 #since theta is in global
         print("KF-z_hat: ", z_hat)
         fflag = False
-        if z_true[2,0]*z_hat[2,0] < 0:
-            # z_hat[2,0] = -z_hat[2,0]
-            # fflag = True
-            mu_bar = mu_bar+K_t@(z_true-z_hat)
-            np_diff_z_filtered_map = np.append(np_diff_z_filtered_map, (z_true-z_hat))
-            print("KF-(z_true-z_hat): ", z_true-z_hat)
-            sigma_bar = (np.identity(sigma_bar.shape[0])-(K_t @ C)) @ sigma_bar
-        else:
-            mu_bar = mu_bar+K_t@(z_true-z_hat)
-            np_diff_z_filtered_map = np.append(np_diff_z_filtered_map, (z_true-z_hat))
-            print("KF-(z_true-z_hat): ", z_true-z_hat)
-            sigma_bar = (np.identity(sigma_bar.shape[0])-(K_t @ C)) @ sigma_bar 
+        mu_bar = mu_bar+K_t@(z_true-z_hat)
+        print('K_t: ', K_t)
+        np_diff_z_filtered_map = np.append(np_diff_z_filtered_map, (z_true-z_hat))
+        print("KF-(z_true-z_hat): ", z_true-z_hat)
+        sigma_bar = (np.identity(sigma_bar.shape[0])-(K_t @ C)) @ sigma_bar 
 
         '''update belief'''
         mu, sigma = mu_bar, sigma_bar
@@ -394,12 +387,16 @@ if __name__ == "__main__":
         #     # tmp = (mu_bar[:2,0] - robot_xy_new[:,0])
         #     plot_traj((x_pos_true, y_pos_true, theta_pos_true), (mu_x, mu_y, mu_theta), (obs_lm_x, obs_lm_y, obs_lm_radi),(lm_x,lm_y,lm_radi),i, \
         #                 np_z_hat, np_z_true, (bel_x, bel_y, bel_theta), (real_x, real_y, real_tehta), cols, icp_flag, flag)   
-        if fflag == True:
+        # if fflag == True:
+        #     plot_utils.plot_traj( (filtered_utm_x,filtered_utm_y,filtered_utm_t), (mu_x, mu_y, mu_theta), (obs_lm_utm_x, obs_lm_utm_y, obs_lm_radi), (lm_x,lm_y,lm_radi),i, \
+        #         np_z_hat, np_z_true, (bel_x, bel_y, bel_theta), mu, cols, icp_flag)
+        if i>1500: #or i% == 01113  503
             plot_utils.plot_traj( (filtered_utm_x,filtered_utm_y,filtered_utm_t), (mu_x, mu_y, mu_theta), (obs_lm_utm_x, obs_lm_utm_y, obs_lm_radi), (lm_x,lm_y,lm_radi),i, \
                 np_z_hat, np_z_true, (bel_x, bel_y, bel_theta), mu, cols, icp_flag)
-        if i%3500 == 0 : #or i% == 01113  503
-            plot_utils.plot_traj( (filtered_utm_x,filtered_utm_y,filtered_utm_t), (mu_x, mu_y, mu_theta), (obs_lm_utm_x, obs_lm_utm_y, obs_lm_radi), (lm_x,lm_y,lm_radi),i, \
-                np_z_hat, np_z_true, (bel_x, bel_y, bel_theta), mu, cols, icp_flag)
+            
+            np_diff_z_filtered_map = np.reshape( np_diff_z_filtered_map, (-1,3) )
+            np_diff_z_filtered_map = np_diff_z_filtered_map.T
+            plot_utils.plot_respect_to_time(np_diff_z_filtered_map[2,:])
             # plot_utils.plot_traj( (mu_hat_x, mu_hat_y, mu_hat_theta),(utm_x_loc_origin, utm_y_loc_origin, utm_t_loc_origin), (mu_x, mu_y, mu_theta), (obs_lm_utm_x, obs_lm_utm_y, obs_lm_radi),(lm_x,lm_y,lm_radi),i, \
             #         np_z_hat, np_z_true, cols, icp_flag, flag) 
         # plot_traj(gps_states, belief_states, update_states, markers, markers_in_map, index, np_z_hat, np_z_true, cols, icp_flag, flag):

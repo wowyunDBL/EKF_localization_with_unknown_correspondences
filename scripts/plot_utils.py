@@ -323,7 +323,7 @@ def plot_transformed(P, U, robot_pose, theta, count):
     plt.legend(fontsize=15)
     plt.show()
     
-def plot_respect_to_time( mu_hat, mu_hat_lm, mu, obs_lm_number):
+def plot_respect_to_time_mu( mu_hat, mu_hat_lm, mu, obs_lm_number):
     (mu_hat_x, mu_hat_y, mu_hat_theta), (mu_hat_lm_x, mu_hat_lm_y, mu_hat_lm_theta), (mu_x, mu_y, mu_theta) \
         =  mu_hat, mu_hat_lm, mu
     # timestamp = np.array(range(mu_hat_x.shape[1]-1)) + 1
@@ -343,4 +343,21 @@ def plot_respect_to_time( mu_hat, mu_hat_lm, mu, obs_lm_number):
     plt.legend(fontsize=15)
     plt.show()
 
-# def 
+def plot_respect_to_time(data):
+    
+    # timestamp = np.array(range(mu_hat_x.shape[1]-1)) + 1
+    timestamp = np.array(range( len(data) )) + 0
+    timestamp1 = np.array(range(100-1,1627-1)) + 1
+
+    fig, ax = plt.subplots(figsize=(25,8),dpi=160)
+        
+    # plt.scatter(timestamp, mu_x[0][99:1627], color='b', s=64, label='mu')
+    # plt.scatter(timestamp1, mu_hat_lm_x[0][100:1627], color='g', s=32, label='mu_hat_lm')
+    # plt.scatter(timestamp1, mu_hat_x[0][100:1627], color='r', s=8, label='mu_hat')
+    plt.scatter(timestamp, data, color='y', s=13, label='angle diff')
+
+    plt.title('angle diff vs. time', fontsize=25)
+    plt.yticks(fontsize=20)
+    plt.xticks(fontsize=20)
+    plt.legend(fontsize=15)
+    plt.show()
